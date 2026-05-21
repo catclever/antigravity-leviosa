@@ -26,6 +26,15 @@
 - 🖱️ **Permission UX Overhaul**:Double-click to submit, plus highlighted borders. Isn't this basic UX? This Electron app's interaction design is literally worse than a CLI...<br>
   🖱️ **权限操作优化**：支持双击提交，增加高亮边框（这不基操么，Electron 交互做得连 CLI 都不如的玩意儿...
 
+- 🐱 **KitiGravity**: God might have given us a hundred ways to open a terminal, but who could possibly resist summoning a kitty with a single click?<br>
+  🐱 **KitiGravity**：虽然上帝给了100种打开终端的方式，但是谁能拒绝一键召唤小猫呢？
+
+- 💻 **VSGGravity**: Even if it absolutely has to be opened in an IDE, Google probably pick Antigravtity IDE...But why not VSCode?<br>
+  💻 **VSGGravity**：就算一定要在IDE中打开，Google应该也不会选它吧？但是为什么不选它呢？
+
+- ⚡ **ZediGravity**: Did you say IDE? Step aside, you sins of Electron!<br>
+  ⚡ **ZediGravity**：你说IDE？就让我来涤荡Eletron的罪孽吧！ …… 幸甚至哉，鸽以咏志！
+
 
 ## Background
 
@@ -146,6 +155,8 @@ Adds a slick golden border and glow to the currently selected radio button optio
 - 🐱 **KitiGravity**: God might have given us a hundred ways to open a terminal, but who could possibly resist summoning a kitty with a single click?<br>**KitiGravity**：虽然上帝给了100种打开终端的方式，但是谁能拒绝一键召唤小猫呢？
 - 💻 **VSGGravity**: Even if it absolutely has to be opened in an IDE, Google probably pick Antigravtity IDE...But why not VSCode?<br>**VSGGravity**：就算一定要在IDE中打开，Google应该也不会选它吧？但是为什么不选它呢？
 - ⚡ **ZediGravity**: Did you say IDE? Step aside, you sins of Electron!<br>**ZediGravity**：你说IDE？就让我来涤荡Eletron的罪孽吧！
-……
+- ……
+
 **幸甚至哉，鸽以咏志！**
+
 （如果你看得懂，请不要尝试翻译，把它留给ai吧...）
