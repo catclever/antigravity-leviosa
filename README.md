@@ -61,7 +61,7 @@ At its core, this extension works by injecting custom JavaScript and CSS directl
 
 **核心原理**：本质上，这个扩展是通过直接向面板注入自定义的 JavaScript 和 CSS 来覆盖默认 UI 并引入新功能的。虽然很多功能完全在浏览器内运行，但部分动态功能需要依赖于查询本地数据源。
 
-> 🇨🇳 [点击这里查看快速开始的完整中文版指南 (Click here for the full Chinese Quick Start Guide)](./QUICKSTART_zh.md)
+> 🇨🇳 [点击这里中文版指南](./QUICKSTART_zh.md)
 
 To get everything up and running, follow these three steps:
 
@@ -152,9 +152,9 @@ Injects a highly responsive search box directly into the project selection popov
 Adds a slick golden border and glow to the currently selected radio button options in dialogs, making it much clearer what you have selected. More importantly, it introduces a "click-again to submit" behavior: if you click an already-selected radio option, it will automatically find and trigger the "Submit" button for you. This dramatically speeds up interactions when dealing with multiple-choice workflows!
 
 ## Todos
-- 🐱 **KitiGravity**: God might have given us a hundred ways to open a terminal, but who could possibly resist summoning a kitty with a single click?<br>**KitiGravity**：虽然上帝给了100种打开终端的方式，但是谁能拒绝一键召唤小猫呢？
-- 💻 **VSGGravity**: Even if it absolutely has to be opened in an IDE, Google probably pick Antigravtity IDE...But why not VSCode?<br>**VSGGravity**：就算一定要在IDE中打开，Google应该也不会选它吧？但是为什么不选它呢？
-- ⚡ **ZediGravity**: Did you say IDE? Step aside, you sins of Electron!<br>**ZediGravity**：你说IDE？就让我来涤荡Eletron的罪孽吧！
+- 🐱 **KitiGravity**: God might have given us a hundred ways to open a terminal, but who could possibly resist summoning a kitty with a single click?<br>**🐱 KitiGravity**：虽然上帝给了100种打开终端的方式，但是谁能拒绝一键召唤小猫呢？
+- 💻 **VSGGravity**: Even if it absolutely has to be opened in an IDE, Google probably pick Antigravtity IDE...But why not VSCode?<br>💻 **VSGGravity**：就算一定要在IDE中打开，Google应该也不会选它吧？但是为什么不选它呢？
+- ⚡ **ZediGravity**: Did you say IDE? Step aside, you sins of Electron!<br>⚡ **ZediGravity**：你说IDE？就让我来涤荡Eletron的罪孽吧！
 - ……
 
 **幸甚至哉，鸽以咏志！**
