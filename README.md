@@ -73,9 +73,7 @@ This extension is designed to work seamlessly with my local **Taichi** service (
 #### Method 2: The DIY Mock Server
 If you don't want to pull the entire Taichi repo, no worries! You can easily spin up a tiny local mock server to satisfy the API requirements. 
 
-*(Note: If you use this method, you can completely ignore the `taichi_theme_sync.js` file included in the download, as your mock server will handle that job instead!)*
-
-> *Note: The extension expects a GET request to `http://127.0.0.1:9216/api/script/taichi_theme_sync?project=<name>`. The path name `taichi_theme_sync` comes from the fact that it's executed as a specific script within the Taichi environment. We are simply using the exact same path here in our mock server to ensure full compatibility without having to modify the extension's code!*
+> *Note: If you use this method, you can completely ignore the `taichi_theme_sync.js` file included in the download, as your mock server will handle that job instead. The extension expects a GET request to `http://127.0.0.1:9216/api/script/taichi_theme_sync?project=<name>`. The path name `taichi_theme_sync` comes from the fact that it's executed as a specific script within the Taichi environment. I am simply using the exact same path here in my mock server to ensure full compatibility without having to modify the extension's code!*
 
 We have prepared two quick-start guides depending on your preferred language. Click the links below for the full scripts:
 - [Using Node.js (Quick & Easy)](./mock_server_node.md)

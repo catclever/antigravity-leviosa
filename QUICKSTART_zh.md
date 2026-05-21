@@ -24,9 +24,7 @@
 #### 方法二：自建 Mock 服务
 如果你不想拉取整个 Taichi 仓库，完全没问题！你可以轻松启动一个微型的本地 Mock 服务来满足 API 请求。
 
-*（注意：如果你使用这种方法，你完全可以无视下载包里的 `taichi_theme_sync.js` 文件，因为你的 mock 服务会接管它的工作！）*
-
-> *注意：扩展会向 `http://127.0.0.1:9216/api/script/taichi_theme_sync?project=<name>` 发送 GET 请求。路径名叫 `taichi_theme_sync` 是因为它在 Taichi 环境中作为特定脚本执行。我们在 mock 服务里直接复用这个路径，只是为了保证完全兼容而不需要去改动扩展的前端代码！*
+> *注意：如果你使用这种方法，完全可以无视下载包里的 `taichi_theme_sync.js` 文件，因为你的 mock 服务会接管它的工作。另外，扩展会向 `http://127.0.0.1:9216/api/script/taichi_theme_sync?project=<name>` 发送 GET 请求。路径名叫 `taichi_theme_sync` 是因为它在 Taichi 环境中作为特定脚本执行。我在这里直接复用了这个路径，只是为了保证完全兼容而不需要去改动扩展的前端代码！*
 
 我们为你准备了两种常用语言的快速上手指南。点击下方链接查看完整脚本：
 - [使用 Node.js（简单快捷）](./mock_server_node_zh.md)
