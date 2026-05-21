@@ -1,8 +1,8 @@
 # Antigravity Leviosa
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/catclever/antigravity-leviosa/main/images/preview-1.png" alt="Preview 1" width="48%">
-  <img src="https://raw.githubusercontent.com/catclever/antigravity-leviosa/main/images/preview-2.png" alt="Preview 2" width="48%">
+  <img src="images/preview-1.png" alt="Preview 1" width="48%">
+  <img src="images/preview-2.png" alt="Preview 2" width="48%">
 </p>
 
 ## What's in the Box? 
@@ -27,10 +27,8 @@
 ## Background
 
 Google decided to bless us with a whole bunch of updates on May 20th:
-
-More colour Gemini web and app with STRANGE (aka Ugly) Chinese typography (I'm sure AI wrote the i18n code...)
-
-Antigravity became an AI-first dashboard, and the original IDE mode got renamed to *Antigravity IDE*. All the original data got hooked up to the new Antigravity (where a single conversation is treated as a project). Meanwhile, the data in the IDE went... completely wiped out. (Seriously, does any PM actually have the authority to make a decision like this?)
+- More colour Gemini web and app with STRANGE (aka Ugly) Chinese typography (I'm sure AI wrote the i18n code...)
+- Antigravity became an AI-first dashboard, and the original IDE mode got renamed to *Antigravity IDE*. All the original data got hooked up to the new Antigravity (where a single conversation is treated as a project). Meanwhile, the data in the IDE went... completely wiped out. (Seriously, does any PM actually have the authority to make a decision like this?)
 
 
 So Antigravity? Well... Gemini is smart, but *only* inside Antigravity. After all, it's tens of light years away — you literally *need* Antigravity to not look like an idiot.
