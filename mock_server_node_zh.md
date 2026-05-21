@@ -1,13 +1,13 @@
-# DIY Mock Server (Node.js)
+# 自建 Mock 服务 (Node.js)
 
-**Using Node.js (Quick & Easy):**
+**使用 Node.js（简单快捷）:**
 
-1. Initialize a new folder and install dependencies:
+1. 初始化一个新文件夹并安装依赖：
    ```bash
    npm init -y
    npm install express cors
    ```
-2. Create a `server.js` file:
+2. 创建一个 `server.js` 文件：
    ```javascript
    const express = require('express');
    const cors = require('cors');
@@ -17,7 +17,7 @@
 
    app.use(cors());
 
-   // Configuration: Add the absolute paths to the directories where your projects are stored
+   // 配置项：在此处添加你所有存放项目文件夹的根目录的绝对路径
    const PROJECT_ROOTS = [
        '/Users/YourName/Projects',
        '/Users/YourName/Documents',
@@ -26,19 +26,19 @@
 
    app.get('/api/script/taichi_theme_sync', (req, res) => {
        const projectParam = req.query.project;
-       let color = '#999999'; // Default fallback color
+       let color = '#999999'; // 默认保底颜色
        
        if (projectParam) {
-           // 1. Handle VS Code Multi-Root Workspaces (comma-separated names)
+           // 1. 处理 VS Code 的 Multi-Root Workspaces（以逗号分隔的项目名）
            const subProjects = projectParam.split(',').map(p => p.trim()).filter(Boolean);
            
            for (const project of subProjects) {
                for (const root of PROJECT_ROOTS) {
                    let settingsPath = path.join(root, project, '.vscode', 'settings.json');
                    
-                   // 2. Exact Match Check
+                   // 2. 检查精确匹配的文件夹
                    if (!fs.existsSync(settingsPath)) {
-                       // 3. Fallback: Fuzzy Match (find directory containing the name)
+                       // 3. 降级方案：模糊匹配（查找包含该名称的目录）
                        if (fs.existsSync(root)) {
                            try {
                                const items = fs.readdirSync(root, { withFileTypes: true });
@@ -55,22 +55,22 @@
                        }
                    }
 
-                   // If we found a valid settings file, extract the color
+                   // 如果找到了有效的 settings 文件，提取颜色
                    if (fs.existsSync(settingsPath)) {
                        try {
                            const content = fs.readFileSync(settingsPath, 'utf8');
-                           // Using regex to safely extract the color, avoiding JSON.parse errors due to comments
+                           // 使用正则表达式安全提取颜色，避免因为带注释导致 JSON.parse 解析失败
                            const match = content.match(/"peacock\.color"\s*:\s*"([^"]+)"/);
                            if (match) {
                                color = match[1];
-                               break; // Stop searching root directories if color is found
+                               break; // 如果找到颜色，停止搜索根目录列表
                            }
                        } catch (e) {
                            console.error(`Error reading settings for ${project}:`, e);
                        }
                    }
                }
-               if (color !== '#999999') break; // Stop searching sub-projects if color is found
+               if (color !== '#999999') break; // 如果找到颜色，停止搜索子项目
            }
        }
 
@@ -79,4 +79,4 @@
 
    app.listen(9216, '127.0.0.1', () => console.log('Mock server running on port 9216!'));
    ```
-3. Run it with `node server.js`.
+3. 运行它： `node server.js`。

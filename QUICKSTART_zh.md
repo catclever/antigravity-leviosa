@@ -29,8 +29,8 @@
 > *注意：扩展会向 `http://127.0.0.1:9216/api/script/taichi_theme_sync?project=<name>` 发送 GET 请求。路径名叫 `taichi_theme_sync` 是因为它在 Taichi 环境中作为特定脚本执行。我们在 mock 服务里直接复用这个路径，只是为了保证完全兼容而不需要去改动扩展的前端代码！*
 
 我们为你准备了两种常用语言的快速上手指南。点击下方链接查看完整脚本：
-- [使用 Node.js（简单快捷）](./mock_server_node.md)
-- [使用 Python 3](./mock_server_python.md)
+- [使用 Node.js（简单快捷）](./mock_server_node_zh.md)
+- [使用 Python 3](./mock_server_python_zh.md)
 
 无论你选择哪种方法，在进入最后一步之前，请确保该服务正在运行。
 

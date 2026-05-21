@@ -1,8 +1,8 @@
-# DIY Mock Server (Python 3)
+# 自建 Mock 服务 (Python 3)
 
-**Using Python 3:**
+**使用 Python 3:**
 
-1. Save this as `server.py`:
+1. 将以下代码保存为 `server.py`：
    ```python
    from http.server import BaseHTTPRequestHandler, HTTPServer
    import json
@@ -10,7 +10,7 @@
    import os
    import re
 
-   # Configuration: Add the absolute paths to the directories where your projects are stored
+   # 配置项：在此处添加你所有存放项目文件夹的根目录的绝对路径
    PROJECT_ROOTS = [
        '/Users/YourName/Projects',
        '/Users/YourName/Documents',
@@ -28,19 +28,19 @@
            if parsed_path.path == '/api/script/taichi_theme_sync':
                query = urllib.parse.parse_qs(parsed_path.query)
                project_param = query.get('project', [''])[0]
-               color = '#999999' # Default fallback color
+               color = '#999999' # 默认保底颜色
                
                if project_param:
-                   # 1. Handle VS Code Multi-Root Workspaces (comma-separated names)
+                   # 1. 处理 VS Code 的 Multi-Root Workspaces（以逗号分隔的项目名）
                    sub_projects = [p.strip() for p in project_param.split(',') if p.strip()]
                    
                    for project in sub_projects:
                        for root in PROJECT_ROOTS:
                            settings_path = os.path.join(root, project, '.vscode', 'settings.json')
                            
-                           # 2. Exact Match Check
+                           # 2. 检查精确匹配的文件夹
                            if not os.path.exists(settings_path):
-                               # 3. Fallback: Fuzzy Match (find directory containing the name)
+                               # 3. 降级方案：模糊匹配（查找包含该名称的目录）
                                if os.path.exists(root):
                                    try:
                                        for item in os.listdir(root):
@@ -52,21 +52,21 @@
                                    except Exception:
                                        pass
                            
-                           # If we found a valid settings file, extract the color
+                           # 如果找到了有效的 settings 文件，提取颜色
                            if os.path.exists(settings_path):
                                try:
                                    with open(settings_path, 'r', encoding='utf-8') as f:
                                        content = f.read()
-                                       # Using regex to safely extract the color, avoiding JSON.loads errors
+                                       # 使用正则表达式安全提取颜色，避免因为带注释导致 JSON.loads 解析失败
                                        match = re.search(r'"peacock\.color"\s*:\s*"([^"]+)"', content)
                                        if match:
                                            color = match.group(1)
-                                           break # Stop searching root directories if color is found
+                                           break # 如果找到颜色，停止搜索根目录列表
                                except Exception as e:
                                    print(f"Error reading {settings_path}: {e}")
                        
                        if color != '#999999':
-                           break # Stop searching sub-projects if color is found
+                           break # 如果找到颜色，停止搜索子项目
                
                response = {"success": True, "color": color}
                self.wfile.write(json.dumps(response).encode('utf-8'))
@@ -75,4 +75,4 @@
 
    HTTPServer(('127.0.0.1', 9216), MockServer).serve_forever()
    ```
-2. Run it with `python3 server.py`.
+2. 运行它： `python3 server.py`。
