@@ -1,8 +1,8 @@
 # Antigravity Leviosa
 
 <p align="center">
-  <img src="./images/preview-1.png" alt="Preview 1" width="48%">
-  <img src="./images/preview-2.png" alt="Preview 2" width="48%">
+  <img src="images/preview-1.png" alt="Preview 1" width="48%">
+  <img src="images/preview-2.png" alt="Preview 2" width="48%">
 </p>
 
 ## What's in the Box? 
