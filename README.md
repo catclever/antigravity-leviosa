@@ -55,7 +55,7 @@ Be fair, the dashboard is cool, especially for someone with as many concurrent p
 
 Sure, the dashboard still has a few clunky spots, and RIP to our VS Code extensions. But hey, thanks to Electron, we can just hit it with a good ol' *Leviosa*!
 
-## Quick Start<br>快速开始
+## Quick Start 快速开始
 
 At its core, this extension works by injecting custom JavaScript and CSS directly into the dashboard to override the default UI and introduce new behaviors. While many features run entirely in the browser, some dynamic functionalities rely on querying a local data source.
 
@@ -110,7 +110,7 @@ Finally, you need to tell the Antigravity dashboard to load these custom scripts
    *(Note: The port and endpoint here should match your configuration. If you used the DIY mock server in Step 2 instead of Taichi, you'll need to ensure your local server also serves the directory containing `main.js` statically at this path).*
 5. Right-click the snippet name and select **Run** (or press `Command + Enter`) to execute the code.
 
-## Important Notes<br>注意事项
+## Important Notes 注意事项
 
 - **Re-injection Required:** Since we are dynamically injecting this mod via Developer Tools, it will not persist across app restarts. Every time you fully quit and reopen the Antigravity dashboard, you will need to re-run the Snippet (Step 3).<br>
   **每次重启需重新注入**：由于我们是通过开发者工具动态注入此 mod 的，它不会在应用重启后驻留。每次你完全退出并重新打开 Antigravity 面板时，你都需要重新运行一次 Snippet（即重复第三步）。
