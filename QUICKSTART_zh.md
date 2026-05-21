@@ -16,7 +16,7 @@
 #### 方法一：“Taichi” 方式（推荐，仅限 Mac）
 这个扩展旨在与我本地的 **Taichi** 服务（目前仅限 Mac）无缝协作，该服务将作为这些动态配置的主要数据源。
 
-1. 克隆并启动 Taichi 服务：`https://github.com/catclever/taichi`
+1. 克隆并启动 Taichi 服务：[https://github.com/catclever/taichi](https://github.com/catclever/taichi)
 2. 只需将第一步下载的**整个**文件夹复制到你 Taichi 的本地 scripts 目录中。（这个文件夹既包含了我们的 UI 脚本，也包含了 Taichi 所需的 `taichi_theme_sync.js` 后端插件）。
 3. 一旦 Taichi 在本地运行，它就会自动托管这些文件，并在 `http://127.0.0.1:9216` 暴露所需的接口。
 4. 大功告成！

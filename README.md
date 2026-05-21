@@ -65,7 +65,7 @@ To unlock the full potential of this extension, you'll need a local API endpoint
 #### Method 1: The "Taichi" Way (Recommended, Mac Only)
 This extension is designed to work seamlessly with my local **Taichi** service (currently Mac Only), which acts as the primary data source for these dynamic configurations. 
 
-1. Clone and start the Taichi service: `https://github.com/catclever/taichi`
+1. Clone and start the Taichi service: [https://github.com/catclever/taichi](https://github.com/catclever/taichi)
 2. Simply copy the **entire** downloaded folder from Step 1 into your Taichi's local scripts directory. (This folder contains both our UI scripts and the `taichi_theme_sync.js` backend plugin that Taichi needs).
 3. Once Taichi is running locally, it automatically hosts these files and exposes the required endpoint at `http://127.0.0.1:9216`.
 4. You're good to go!
