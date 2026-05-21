@@ -69,7 +69,7 @@ To get everything up and running, follow these three steps:
 First, you need to get the extension files onto your local machine:
 1. Clone or download this repository to your preferred directory:
    ```bash
-   git clone [Your Repository Link Here]
+   git clone https://github.com/catclever/antigravity-leviosa.git
    ```
 2. Note the absolute path to this directory, as you'll need it for the configuration step.
 
@@ -113,9 +113,9 @@ Finally, you need to tell the Antigravity dashboard to load these custom scripts
 ## Important Notes 注意事项
 
 - **Re-injection Required:** Since we are dynamically injecting this mod via Developer Tools, it will not persist across app restarts. Every time you fully quit and reopen the Antigravity dashboard, you will need to re-run the Snippet (Step 3).<br>
-  **每次重启需重新注入**：由于我们是通过开发者工具动态注入此 mod 的，它不会在应用重启后驻留。每次你完全退出并重新打开 Antigravity 面板时，你都需要重新运行一次 Snippet（即重复第三步）。
+  **每次重启需重新注入**：通过开发者工具动态注入的功能不会在应用重启后驻留。每次完全退出并重新打开 Antigravity 后，你都需要重新运行一次 Snippet（即重复第三步）。
 - **Google "Moves Fast and Breaks Things":** Antigravity is an actively updated product. Future updates to their dashboard's DOM structure or React components might cause some of these features to temporarily or permanently break. (Honestly, I hope Google just natively integrates these features soon so we don't have to keep injecting scripts...)<br>
-  **功能存在失效风险**：Antigravity 是一个在积极更新的产品。未来如果他们面板的 DOM 结构或者 React 组件发生重大变动，可能会导致我们这里的某些功能暂时或者永久失效。（说实话，我倒希望 Google 早点把这些功能原生整合进去，这样咱们就不用天天注入脚本了……）
+  **速生速死**：Antigravity 是一个在积极更新的产品。如果未来 DOM 结构或者 React 组件发生重大变动，可能会导致某些功能暂时或者永久失效。（早用早享受哦~）
 
 ## Features & Configuration
 
