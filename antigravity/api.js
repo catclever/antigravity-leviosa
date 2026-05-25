@@ -3,7 +3,7 @@ const L2_CACHE = new Map();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1小时的内部 L2 缓存
 
 // 【注意】如果你通过 TaiChi 暴露的端口不是 9216 或者路径不同，请在这里修改！
-const API_ENDPOINT = 'http://127.0.0.1:9216/api/script/taichi_theme_sync'; 
+const API_ENDPOINT = 'http://127.0.0.1:9216/api/script/antigravity_theme_sync'; 
 
 export async function fetchThemeColor(projectName) {
     if (!projectName) return null;
@@ -44,4 +44,25 @@ export function getLuminance(hex) {
         return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     }
     return 0;
+}
+
+export async function openProjectBackend(projectName, appName, supportsWorkspace) {
+    if (!projectName) {
+        alert("⚠️ Antigravity: 无法获取当前项目名称，请确认你在某个项目目录中！");
+        return;
+    }
+    try {
+        const url = `http://127.0.0.1:9216/api/script/antigravity_open_project?project=${encodeURIComponent(projectName)}&app=${encodeURIComponent(appName)}&supportsWorkspace=${supportsWorkspace}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (!data.success) {
+            console.error('[Antigravity Mod] 打开项目失败:', data.error);
+            alert(`⚠️ Antigravity 打开失败:\n${data.error || '未知错误'}\n项目: ${projectName}\nApp: ${appName}\n命令: ${data.command || ''}`);
+        } else {
+            console.log(`[Antigravity Mod] 成功在 ${appName} 中打开项目: ${projectName}`);
+        }
+    } catch (err) {
+        console.error(`[Antigravity Mod] 调用后端打开项目失败`, err);
+        alert(`⚠️ Antigravity 请求后台失败！Taichi服务是否在 9216 端口运行？\n${err.message}`);
+    }
 }

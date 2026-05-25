@@ -22,7 +22,7 @@ export const CONFIG = {
     apps: [
         { 
             id: 'web', 
-            name: 'Web IDE', 
+            name: 'Antigravity', 
             isWeb: true,
             icon: `<svg viewBox="0 0 24 24" fill="none" stroke="#3186FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>`
         },
@@ -72,7 +72,7 @@ if (!window._ag_global_listener_added_v5) {
                 e.preventDefault();
                 e.stopPropagation();
                 const proj = extractActiveProjectName() || currentProject;
-                if (proj) openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace);
+                openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace);
             }
             return;
         }
@@ -159,6 +159,8 @@ function updateSelectorButton() {
 
 function extractActiveProjectName() {
     const spans = Array.from(document.querySelectorAll('span.truncate.inline-block'));
+    
+    // 1. 优先尝试多目录模式：寻找后面跟着 '/' 的 span
     for (let i = spans.length - 1; i >= 0; i--) {
         const span = spans[i];
         const rect = span.getBoundingClientRect();
@@ -172,6 +174,18 @@ function extractActiveProjectName() {
             }
         }
     }
+    
+    // 2. 降级：单目录模式。直接取最后一个可见的 truncate span
+    for (let i = spans.length - 1; i >= 0; i--) {
+        const span = spans[i];
+        const rect = span.getBoundingClientRect();
+        if (rect.width === 0) continue; 
+        const text = span.textContent.trim();
+        if (text && text !== '/') {
+            return text;
+        }
+    }
+    
     return null;
 }
 
