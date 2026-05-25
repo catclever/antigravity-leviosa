@@ -11,9 +11,10 @@ export function initProjectDots() {
             if (processedContainers.has(sub)) continue;
 
             const text = sub.textContent.trim();
-            if (!text.includes('/')) continue; // 确保包含 / 才是项目名
+            if (!text) continue;
 
-            const projectPart = text.split('/')[0].trim();
+            // 如果包含 '/'，提取斜杠前的部分作为项目名；否则直接使用全部文本
+            const projectPart = text.includes('/') ? text.split('/')[0].trim() : text;
             processedContainers.add(sub);
 
             const color = await fetchThemeColor(projectPart);

@@ -78,21 +78,27 @@ export function initProjectSearch() {
         setTimeout(() => input.focus(), 50);
     }
 
+    // BUG FIX RECORD
+    // 1. Problem fixed: 搜索框会错误地注入到所有包含 `button.group/popover-item` 的下拉菜单中，而不仅仅是项目列表菜单。
+    // 2. Method/Logic: 使用用户提供的带有超长原子化类名的精细 CSS 选择器（包含 bg-card, w-72, min-w-[200px] 等），替代之前宽泛的 `div[role="dialog"]` 作为过滤条件，精确匹配特有的弹窗。
+    // 3. Caveats: 由于直接依赖 Tailwind 生成的超长类名字符串进行精准匹配，如果官方在未来移除了某个特定的 utility class（比如 `translate-x-0.5`），此判断会失效。若失效，可考虑回归使用 `button[title="Project Settings"]` 等内部特有元素的判断策略。
     // 主力方案：监听 DOM 挂载 (处理 Radix UI Portal 类型的弹窗)
     const observer = new MutationObserver((mutations) => {
         for (let mutation of mutations) {
             for (let node of mutation.addedNodes) {
                 if (node.nodeType === 1) { // ELEMENT_NODE
                     let dialogs = [];
-                    if (node.matches && node.matches('div[role="dialog"]')) {
+                    const targetSelector = 'div.bg-card.text-foreground.origin-bottom.outline-hidden.z-50.rounded-lg.border.shadow-md.overscroll-y-none.w-72.border-border.w-max.min-w-\\[200px\\].translate-x-0\\.5';
+                    
+                    if (node.matches && node.matches(targetSelector)) {
                         dialogs.push(node);
                     }
                     if (node.querySelectorAll) {
-                        dialogs.push(...node.querySelectorAll('div[role="dialog"]'));
+                        dialogs.push(...node.querySelectorAll(targetSelector));
                     }
 
                     for (let dialog of dialogs) {
-                        // 确认这是包含 popover-item 的列表弹窗
+                        // 只依赖上述的长 CSS 选择器，内部只判断基本的弹窗项特征
                         if (dialog.querySelector('button.group\\/popover-item')) {
                             injectSearchBox(dialog);
                         }
@@ -107,10 +113,12 @@ export function initProjectSearch() {
     // 备用方案：监听点击事件，处理不销毁只隐藏的弹窗
     document.addEventListener('click', () => {
         setTimeout(() => {
-            const dialogs = document.querySelectorAll('div[role="dialog"]');
+            const targetSelector = 'div.bg-card.text-foreground.origin-bottom.outline-hidden.z-50.rounded-lg.border.shadow-md.overscroll-y-none.w-72.border-border.w-max.min-w-\\[200px\\].translate-x-0\\.5';
+            const dialogs = document.querySelectorAll(targetSelector);
             dialogs.forEach(dialog => {
                 const style = window.getComputedStyle(dialog);
                 if (style.visibility !== 'hidden' && style.display !== 'none') {
+                    // 实验：只判断基本的弹窗项特征
                     if (dialog.querySelector('button.group\\/popover-item')) {
                         injectSearchBox(dialog);
                     }
