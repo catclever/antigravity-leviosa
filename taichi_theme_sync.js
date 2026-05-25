@@ -9,7 +9,8 @@ const PROJECT_ROOTS = [
     '/Users/kael/.gemini/antigravity/scratch',
     '/Users/kael/Projects',
     '/Users/kael/Documents',
-    '/Users/kael/workbench'
+    '/Users/kael/workbench',
+    '/Users/kael/Library/Services'
 ];
 
 function findProjectSettings(projectName) {
