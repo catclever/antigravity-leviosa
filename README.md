@@ -133,7 +133,6 @@ Injects a highly responsive search box directly into the project selection popov
 
 ### 7. `double_click_submit.js` (Fast Submit & UI Polish)
 Adds a slick golden border and glow to the currently selected radio button options in dialogs, making it much clearer what you have selected. More importantly, it introduces a "click-again to submit" behavior: if you click an already-selected radio option, it will automatically find and trigger the "Submit" button for you. This dramatically speeds up interactions when dealing with multiple-choice workflows!
-
 ### 8. `sidebar_reorder.js` (Sidebar Reorder)
 Tired of your Projects being buried under a mountain of Pinned Conversations? This script uses a slick CSS `order` hack to visually flip them around, bringing your Projects straight to the top. The best part? It does this purely visually, keeping Antigravity's fragile React Virtual DOM completely undisturbed!
 
