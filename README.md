@@ -22,7 +22,8 @@
 - 🖱️ **Permission UX Overhaul**:Double-click to submit, plus highlighted borders. Isn't this basic UX? This Electron app's interaction design is literally worse than a CLI...<br>
   🖱️ **权限操作优化**：支持双击提交，增加高亮边框（这不基操么，Electron 交互做得连 CLI 都不如的玩意儿...
 
-
+- 🚀 **One-Click IDE Opener**: Replaces the native IDE button with a slick multi-app dropdown menu. Open any project directly in VS Code, Kitty terminal, or Finder with a single click!<br>
+  🚀 **一键闪现 IDE**：无缝接管原生的打开按钮，注入多应用下拉菜单。一键直达 VS Code、Kitty 终端或者 Finder，告别繁琐的路径跳转！
 
 ## Background
 
@@ -133,11 +134,17 @@ Injects a highly responsive search box directly into the project selection popov
 
 ### 7. `double_click_submit.js` (Fast Submit & UI Polish)
 Adds a slick golden border and glow to the currently selected radio button options in dialogs, making it much clearer what you have selected. More importantly, it introduces a "click-again to submit" behavior: if you click an already-selected radio option, it will automatically find and trigger the "Submit" button for you. This dramatically speeds up interactions when dealing with multiple-choice workflows!
-### 8. `sidebar_reorder.js` (Sidebar Reorder)
-Tired of your Projects being buried under a mountain of Pinned Conversations? This script uses a slick CSS `order` hack to visually flip them around, bringing your Projects straight to the top. The best part? It does this purely visually, keeping Antigravity's fragile React Virtual DOM completely undisturbed!
 
-### 9. `agy_archive.js` & `archive_hook.js` (Shallow Archive Tool)
-AI tools generate massive logs, and your SSD is definitely feeling it. We built a native command-line utility to automatically clean up those heavy `.system_generated` and `scratch` directories in your `brain` folders. It neatly compresses them into `.tar.gz` archives and maintains a clean index, saving you gigabytes of space without breaking a sweat!
+### 8. `project_opener.js` & `antigravity_open_project.js` (One-Click IDE Opener)
+Overrides the native "Open in IDE" button by injecting a customizable dropdown menu, allowing you to open the active project directly into your preferred tools (VS Code, Kitty, Finder, etc.). It supports both single directories and multi-root workspaces.
+- **Customization:** You can modify the `CONFIG.apps` array at the top of `project_opener.js` to add custom IDEs, change the default application, or update the SVG icons.
+- **Backend Requirement:** This feature relies on the local service (Taichi or Mock Server) to execute the actual shell commands. It expects the endpoint `/api/script/antigravity_open_project` to be available. If using a DIY mock server, you must implement this endpoint to handle the `open` commands.
+
+### 9. `sidebar_reorder.js` (Sidebar Reorder)
+Reorders the sidebar layout by visually moving the "Projects" section above "Pinned Conversations". It achieves this purely through CSS `order` (`-1` and `1`), ensuring no interference with the native React Virtual DOM.
+
+### 10. `agy_archive.js` & `archive_hook.js` (Shallow Archive Tool)
+A Node.js CLI utility that manages local disk usage by cleaning up verbose `.system_generated` logs and `scratch` directories within individual `brain` folders. It compresses the cleaned files into `.tar.gz` archives and maintains an `archive_index.json` metadata record.
 
 ## Todos
 - 🐱 **KitiGravity**: God might have given us a hundred ways to open a terminal, but who could possibly resist summoning a kitty with a single click?<br>**🐱 KitiGravity**：虽然上帝给了100种打开终端的方式，但是谁能拒绝一键召唤小猫呢？
