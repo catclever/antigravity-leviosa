@@ -2,17 +2,6 @@
 const fs = require('fs');
 const path = require('path');
 
-// ==========================================
-// 1. 配置区：沿用你之前的目录
-// ==========================================
-const PROJECT_ROOTS = [
-    '/Users/kael/Library/Services/taichi',
-    '/Users/kael/.gemini/antigravity/scratch',
-    '/Users/kael/Projects',
-    '/Users/kael/Documents',
-    '/Users/kael/workbench'
-];
-
 /**
  * [Bug Fix Documentation]
  * 1. Problem Fixed: The previous implementation relied purely on directory traversal and fuzzy matching across hardcoded PROJECT_ROOTS. This caused multi-directory projects with duplicate names (e.g., a source repo and a deployed service repo) to be incorrectly resolved, often extracting the theme color from the parent directory or the wrong instance.
@@ -53,30 +42,6 @@ function findProjectSettings(projectName) {
         }
     }
 
-    for (const root of PROJECT_ROOTS) {
-        // 1. 优先进行精确匹配
-        const exactPath = path.join(root, projectName, '.vscode', 'settings.json');
-        if (fs.existsSync(exactPath)) {
-            return exactPath;
-        }
-        
-        // 2. 降级：模糊匹配（找包含 projectName 的目录）
-        if (fs.existsSync(root)) {
-            try {
-                const items = fs.readdirSync(root, { withFileTypes: true });
-                for (const item of items) {
-                    if (item.isDirectory() && item.name.includes(projectName)) {
-                        const fuzzyPath = path.join(root, item.name, '.vscode', 'settings.json');
-                        if (fs.existsSync(fuzzyPath)) {
-                            return fuzzyPath;
-                        }
-                    }
-                }
-            } catch (e) {
-                // 忽略读取目录的权限错误等
-            }
-        }
-    }
     return null;
 }
 

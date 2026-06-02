@@ -3,14 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 
-const PROJECT_ROOTS = [
-    '/Users/kael/Library/Services/taichi',
-    '/Users/kael/.gemini/antigravity/scratch',
-    '/Users/kael/Projects',
-    '/Users/kael/Documents',
-    '/Users/kael/workbench'
-];
-
 /**
  * [Bug Fix Documentation]
  * 1. Problem Fixed: The previous implementation relied purely on directory traversal and fuzzy matching across hardcoded PROJECT_ROOTS. This caused multi-directory projects with duplicate names (e.g., a source repo and a deployed service repo) to be incorrectly resolved, often opening the parent directory or the wrong instance.
@@ -50,48 +42,6 @@ function findProjectDir(projectName) {
         }
     }
 
-    for (const root of PROJECT_ROOTS) {
-        // 1. 优先进行顶层精确匹配
-        const exactPath = path.join(root, projectName);
-        if (fs.existsSync(exactPath) && fs.statSync(exactPath).isDirectory()) {
-            return exactPath;
-        }
-    }
-
-    // 2. 尝试子目录精确匹配 (深度=1)，用于多目录/Monorepo场景
-    for (const root of PROJECT_ROOTS) {
-        if (fs.existsSync(root)) {
-            try {
-                const items = fs.readdirSync(root, { withFileTypes: true });
-                for (const item of items) {
-                    if (item.isDirectory()) {
-                        const subPath = path.join(root, item.name, projectName);
-                        if (fs.existsSync(subPath) && fs.statSync(subPath).isDirectory()) {
-                            return subPath;
-                        }
-                    }
-                }
-            } catch (e) {
-                // 忽略权限错误
-            }
-        }
-    }
-
-    // 3. 降级：模糊匹配（找包含 projectName 的目录）
-    for (const root of PROJECT_ROOTS) {
-        if (fs.existsSync(root)) {
-            try {
-                const items = fs.readdirSync(root, { withFileTypes: true });
-                for (const item of items) {
-                    if (item.isDirectory() && item.name.includes(projectName)) {
-                        return path.join(root, item.name);
-                    }
-                }
-            } catch (e) {
-                // 忽略读取目录的权限错误等
-            }
-        }
-    }
     return null;
 }
 
