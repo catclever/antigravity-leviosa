@@ -73,22 +73,40 @@ if (!window._ag_global_listener_added_v5) {
                 e.stopPropagation();
                 const proj = extractActiveProjectName() || currentProject;
                 openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace);
+                window._ag_is_waiting_for_multi_project_selection = false;
+            } else {
+                window._ag_is_waiting_for_multi_project_selection = true;
             }
             return;
         }
 
-        const listbox = e.target.closest('[role="listbox"]');
-        if (listbox && !listbox.classList.contains('ag-dropdown-menu')) {
-            const option = e.target.closest('[role="option"]');
+        const popup = e.target.closest('[role="listbox"], [role="menu"]');
+        if (popup && !popup.classList.contains('ag-dropdown-menu')) {
+            const option = e.target.closest('[role="option"], [role="menuitem"]');
             if (option) {
-                e.preventDefault();
-                e.stopPropagation();
-                const span = option.querySelector('span.truncate');
-                if (span) {
-                    openProjectBackend(span.textContent.trim(), selectedApp.appName, !!selectedApp.supportsWorkspace);
+                if (window._ag_is_waiting_for_multi_project_selection || popup.getAttribute('role') === 'listbox') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    let projectName = '';
+                    const span = option.querySelector('span.truncate');
+                    if (span) {
+                        projectName = span.textContent.trim();
+                    } else {
+                        const spans = Array.from(option.querySelectorAll('span')).filter(s => s.textContent.trim() && !s.querySelector('svg'));
+                        projectName = spans.length > 0 ? spans[spans.length - 1].textContent.trim() : option.textContent.trim();
+                    }
+                    
+                    if (projectName) {
+                        openProjectBackend(projectName, selectedApp.appName, !!selectedApp.supportsWorkspace);
+                    }
+                    setTimeout(() => { document.body.click(); }, 10);
                 }
-                setTimeout(() => { document.body.click(); }, 10);
             }
+        }
+        
+        if (!e.target.closest('[role="listbox"], [role="menu"]') && !e.target.closest('[data-testid^="open-editor"]')) {
+            window._ag_is_waiting_for_multi_project_selection = false;
         }
     }, true); 
 }
