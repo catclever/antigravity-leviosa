@@ -133,11 +133,11 @@ Injects a highly responsive search box directly into the project selection popov
 
 ### 7. `double_click_submit.js` (Fast Submit & UI Polish)
 Adds a slick golden border and glow to the currently selected radio button options in dialogs, making it much clearer what you have selected. More importantly, it introduces a "click-again to submit" behavior: if you click an already-selected radio option, it will automatically find and trigger the "Submit" button for you. This dramatically speeds up interactions when dealing with multiple-choice workflows!
-### 8. `sidebar_reorder.js` (Visual Sidebar Tweaks)
-Reorders the sidebar layout to prioritize your active work. It safely uses CSS `order` (`-1` and `1`) to visually move the "Projects" section above "Pinned Conversations" without interfering with Antigravity's React Virtual DOM.
+### 8. `sidebar_reorder.js` (Sidebar Reorder)
+Tired of your Projects being buried under a mountain of Pinned Conversations? This script uses a slick CSS `order` hack to visually flip them around, bringing your Projects straight to the top. The best part? It does this purely visually, keeping Antigravity's fragile React Virtual DOM completely undisturbed!
 
 ### 9. `agy_archive.js` & `archive_hook.js` (Shallow Archive Tool)
-A built-in utility specifically designed for managing Antigravity's heavy disk usage. `agy_archive.js` is a Node.js CLI script that cleans up verbose `.system_generated` logs and `scratch` directories within individual `brain` folders, compresses them into `.tar.gz` archives, and records the metadata in an `archive_index.json` file.
+AI tools generate massive logs, and your SSD is definitely feeling it. We built a native command-line utility to automatically clean up those heavy `.system_generated` and `scratch` directories in your `brain` folders. It neatly compresses them into `.tar.gz` archives and maintains a clean index, saving you gigabytes of space without breaking a sweat!
 
 ## Todos
 - 🐱 **KitiGravity**: God might have given us a hundred ways to open a terminal, but who could possibly resist summoning a kitty with a single click?<br>**🐱 KitiGravity**：虽然上帝给了100种打开终端的方式，但是谁能拒绝一键召唤小猫呢？
