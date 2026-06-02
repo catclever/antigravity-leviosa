@@ -112,11 +112,10 @@ This is the conductor that imports and initializes all other modules.
 ### 2. `api.js` (The Data Bridge)
 Handles the communication between the dashboard and your local data source (Taichi or Mock Server) to fetch project theme colors.
 - **Caching:** To keep the UI snappy and avoid spamming your local service, this module features a built-in L2 memory cache with a Time-To-Live (TTL) of **1 hour**.
-- **Color Extraction Mechanism:** The theme colors depend on the `.vscode/settings.json` located in your local project folders. When requesting colors, the backend script employs a highly robust scanning mechanism:
-  1. **Multi-Root Workspace Parsing:** It splits comma-separated project names (common in VS Code multi-root setups) and scans each sub-project sequentially.
-  2. **Exact Matching:** It searches for an exact folder match in your configured root directories.
-  3. **Fuzzy Matching:** If an exact match fails, it automatically falls back to finding any directory whose name *contains* the requested project name, ensuring colors are found even if the UI truncates the name.
-- **🚨 CRITICAL CONFIGURATION:** For this to work, you **MUST** explicitly define the absolute paths to your project directories in your backend script (`antigravity_theme_sync.js` or your custom server). Otherwise, the backend won't know where to look for your `.vscode` folders!
+- **Color Extraction Mechanism:** The theme colors depend on the `.vscode/settings.json` located in your local project folders. When requesting colors, the backend script employs a highly robust zero-config scanning mechanism:
+  1. **Multi-Root Workspace Parsing:** It splits comma-separated project names and scans each sub-project sequentially.
+  2. **SQLite Exact Matching:** It directly queries the IDE's local SQLite database (`state.vscdb`) to fetch the absolute paths of your recently opened workspaces. This ensures `O(1)` precision and gracefully handles duplicate folder names without requiring any manual path configuration!
+  3. **Fuzzy Fallback:** If the exact path isn't found in the database, it falls back to a fuzzy search across common fallback directories.
 
 ### 3. `background.js` (Workspace Background)
 Injects a custom background image into the dashboard along with some base CSS tweaks to make the UI look gorgeous.
