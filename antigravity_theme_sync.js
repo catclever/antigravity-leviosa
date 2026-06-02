@@ -2,78 +2,70 @@
 const fs = require('fs');
 const path = require('path');
 
-// ==========================================
-// 1. 配置区：沿用你之前的目录
-// ==========================================
-const PROJECT_ROOTS = [
-    '/Users/kael/Library/Services/taichi',
-    '/Users/kael/.gemini/antigravity/scratch',
-    '/Users/kael/Projects',
-    '/Users/kael/Documents',
-    '/Users/kael/workbench'
-];
-
 /**
  * [Bug Fix Documentation]
- * 1. Problem Fixed: The previous implementation relied purely on directory traversal and fuzzy matching across hardcoded PROJECT_ROOTS. This caused multi-directory projects with duplicate names (e.g., a source repo and a deployed service repo) to be incorrectly resolved, often extracting the theme color from the parent directory or the wrong instance.
- * 2. Resolution Logic: Introduced `getRecentWorkspaces()` to query the IDE's SQLite database (`state.vscdb`) for `history.recentlyOpenedPathsList`. This acts as a dynamic source of truth for active workspace paths, enabling exact O(1) matching based on the absolute paths instead of guessing.
- * 3. Caveats/Notes: Relies on macOS native `sqlite3` CLI tool. If Antigravity IDE alters the path to `state.vscdb` in future updates, the `dbPath` constant here must be updated.
+ * 1. Problem Fixed: The previous SQLite-only approach was flawed because `state.vscdb` only stores a limited length of "recently opened" workspaces, leading to missing projects. Hardcoded `PROJECT_ROOTS` were needed as a fallback.
+ * 2. Resolution Logic: Introduced `getAllKnownWorkspaces()` which scans `workspaceStorage` directories across Antigravity, VS Code, and Cursor. Because `workspaceStorage` permanently assigns an MD5 hash folder to EVERY workspace ever opened, this acts as a flawless, exhaustive database.
+ * 3. Result: Hardcoded `PROJECT_ROOTS` arrays and traversal loops are now completely removed.
  */
-function getRecentWorkspaces() {
+function getAllKnownWorkspaces() {
+    const paths = new Set();
+
+    // 1. 从 SQLite 历史提取 (保证最近期打开的排在前面)
     try {
-        const dbPath = '/Users/kael/Library/Application Support/Antigravity/User/globalStorage/state.vscdb';
+        const dbPath = path.join(process.env.HOME, 'Library/Application Support/Antigravity/User/globalStorage/state.vscdb');
         const query = "SELECT value FROM ItemTable WHERE key = 'history.recentlyOpenedPathsList';";
         const result = require('child_process').execSync(`sqlite3 "${dbPath}" "${query}"`, { encoding: 'utf-8' });
         const json = JSON.parse(result.trim());
-        const paths = [];
         if (json.entries) {
             for (const entry of json.entries) {
                 if (entry.folderUri && entry.folderUri.startsWith('file://')) {
-                    paths.push(decodeURIComponent(entry.folderUri.substring(7)));
+                    paths.add(decodeURIComponent(entry.folderUri.substring(7)));
                 } else if (entry.workspace && entry.workspace.configPath && entry.workspace.configPath.startsWith('file://')) {
-                    paths.push(path.dirname(decodeURIComponent(entry.workspace.configPath.substring(7))));
+                    paths.add(path.dirname(decodeURIComponent(entry.workspace.configPath.substring(7))));
                 }
             }
         }
-        return paths;
-    } catch (e) {
-        return [];
+    } catch (e) {}
+
+    // 2. 从所有 IDE 的 workspaceStorage 地毯式提取（全量历史）
+    const bases = [
+        path.join(process.env.HOME, 'Library/Application Support/Antigravity/User/workspaceStorage'),
+        path.join(process.env.HOME, 'Library/Application Support/Code/User/workspaceStorage'),
+        path.join(process.env.HOME, 'Library/Application Support/Cursor/User/workspaceStorage')
+    ];
+    
+    for (const base of bases) {
+        if (!fs.existsSync(base)) continue;
+        try {
+            const dirs = fs.readdirSync(base);
+            for (const dir of dirs) {
+                const wsJson = path.join(base, dir, 'workspace.json');
+                if (fs.existsSync(wsJson)) {
+                    try {
+                        const data = JSON.parse(fs.readFileSync(wsJson, 'utf-8'));
+                        if (data.folder && data.folder.startsWith('file://')) {
+                            paths.add(decodeURIComponent(data.folder.substring(7)));
+                        } else if (data.workspace && data.workspace.startsWith('file://')) {
+                            paths.add(path.dirname(decodeURIComponent(data.workspace.substring(7))));
+                        }
+                    } catch (e) {}
+                }
+            }
+        } catch (e) {}
     }
+    
+    return Array.from(paths);
 }
 
 function findProjectSettings(projectName) {
-    // 0. 极致优雅：直接从 Antigravity 全局数据库精确读取最近打开的工作区
-    const recentPaths = getRecentWorkspaces();
-    for (const p of recentPaths) {
+    // 终极优雅：从 IDE 的全量工作区记录中精确匹配
+    const knownPaths = getAllKnownWorkspaces();
+    for (const p of knownPaths) {
         if (path.basename(p) === projectName) {
             const settingsPath = path.join(p, '.vscode', 'settings.json');
             if (fs.existsSync(settingsPath)) {
                 return settingsPath;
-            }
-        }
-    }
-
-    for (const root of PROJECT_ROOTS) {
-        // 1. 优先进行精确匹配
-        const exactPath = path.join(root, projectName, '.vscode', 'settings.json');
-        if (fs.existsSync(exactPath)) {
-            return exactPath;
-        }
-        
-        // 2. 降级：模糊匹配（找包含 projectName 的目录）
-        if (fs.existsSync(root)) {
-            try {
-                const items = fs.readdirSync(root, { withFileTypes: true });
-                for (const item of items) {
-                    if (item.isDirectory() && item.name.includes(projectName)) {
-                        const fuzzyPath = path.join(root, item.name, '.vscode', 'settings.json');
-                        if (fs.existsSync(fuzzyPath)) {
-                            return fuzzyPath;
-                        }
-                    }
-                }
-            } catch (e) {
-                // 忽略读取目录的权限错误等
             }
         }
     }
