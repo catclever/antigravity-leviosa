@@ -84,7 +84,7 @@ if (!window._ag_global_listener_added_v5) {
         if (popup && !popup.classList.contains('ag-dropdown-menu')) {
             const option = e.target.closest('[role="option"], [role="menuitem"]');
             if (option) {
-                if (window._ag_is_waiting_for_multi_project_selection || popup.getAttribute('role') === 'listbox') {
+                if (window._ag_is_waiting_for_multi_project_selection) {
                     e.preventDefault();
                     e.stopPropagation();
                     
