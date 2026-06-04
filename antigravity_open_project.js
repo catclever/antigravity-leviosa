@@ -59,8 +59,47 @@ function getAllKnownWorkspaces() {
     return Array.from(paths);
 }
 
+const PROJECT_ROOTS = [
+    path.join(process.env.HOME, 'Library/Services/taichi'),
+    path.join(process.env.HOME, '.gemini/antigravity/scratch'),
+    path.join(process.env.HOME, 'Projects'),
+    path.join(process.env.HOME, 'Documents'),
+    path.join(process.env.HOME, 'workbench')
+];
+
+function findProjectDirFast(startPaths, targetName, maxDepth = 4) {
+    const queue = startPaths.map(p => ({ dir: p, depth: 0 }));
+    
+    while (queue.length > 0) {
+        const { dir, depth } = queue.shift();
+        
+        if (depth > maxDepth) continue;
+        if (!fs.existsSync(dir)) continue;
+        
+        try {
+            const items = fs.readdirSync(dir, { withFileTypes: true });
+            for (const item of items) {
+                if (item.isDirectory()) {
+                    if (item.name === 'node_modules' || item.name === '.git' || item.name === 'venv' || item.name === '.venv') continue;
+                    
+                    const fullPath = path.join(dir, item.name);
+                    if (item.name === targetName) {
+                        return fullPath;
+                    }
+                    if (depth < maxDepth) {
+                        queue.push({ dir: fullPath, depth: depth + 1 });
+                    }
+                }
+            }
+        } catch (e) {
+            // ignore access errors
+        }
+    }
+    return null;
+}
+
 function findProjectDir(projectName) {
-    // 终极优雅：从 IDE 的全量工作区记录中精确匹配
+    // 1. 终极优雅：从 IDE 的全量工作区记录中精确匹配 (O(1))
     const knownPaths = getAllKnownWorkspaces();
     for (const p of knownPaths) {
         if (path.basename(p) === projectName) {
@@ -69,6 +108,11 @@ function findProjectDir(projectName) {
             }
         }
     }
+    
+    // 2. 备选方案：通过 BFS 快速扫描常用目录 (深度4)，解决未被 IDE 记录的新项目或深层中文路径
+    const fallbackPath = findProjectDirFast(PROJECT_ROOTS, projectName);
+    if (fallbackPath) return fallbackPath;
+
     return null;
 }
 
