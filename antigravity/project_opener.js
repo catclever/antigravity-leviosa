@@ -175,7 +175,7 @@ function updateSelectorButton() {
     }
 }
 
-function extractActiveProjectName() {
+export function extractActiveProjectName() {
     const spans = Array.from(document.querySelectorAll('span.truncate.inline-block'));
     
     // 1. 优先尝试多目录模式：寻找后面跟着 '/' 的 span

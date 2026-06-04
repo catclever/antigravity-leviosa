@@ -66,3 +66,17 @@ export async function openProjectBackend(projectName, appName, supportsWorkspace
         alert(`⚠️ Antigravity 请求后台失败！Taichi服务是否在 9216 端口运行？\n${err.message}`);
     }
 }
+
+export async function fetchKnowledgeIndex(projectName, scope = 'all') {
+    try {
+        const url = `http://127.0.0.1:9216/api/script/antigravity_knowledge_index?project=${encodeURIComponent(projectName || '')}&scope=${encodeURIComponent(scope)}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data.success && data.rules) {
+            return data.rules;
+        }
+    } catch (err) {
+        console.error(`[Antigravity Mod] 获取项目知识库列表失败`, err);
+    }
+    return [];
+}

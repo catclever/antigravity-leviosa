@@ -7,6 +7,7 @@ import { initDoubleClickSubmit } from './double_click_submit.js';
 import { initProjectOpener } from './project_opener.js';
 import { initSidebarReorder } from './sidebar_reorder.js';
 import { initArchiveHook } from './archive_hook.js';
+import { initKbTrigger } from './kb_trigger.js';
 
 console.log('🚀 [Antigravity Mod] 正在加载模块化组件...');
 
@@ -19,5 +20,6 @@ initDoubleClickSubmit();
 initProjectOpener();
 initSidebarReorder();
 initArchiveHook();
+initKbTrigger();
 
 console.log('✅ [Antigravity Mod] 所有模块加载完毕！');
