@@ -85,7 +85,7 @@ Whichever method you choose, ensure the service is running before proceeding to 
 ### Step 3: Configure Antigravity
 Finally, you need to tell the Antigravity dashboard to load these custom scripts.
 
-1. In the Antigravity dashboard, open the Developer Tools by pressing `Command + Option + I` (on Mac).
+1. In the Antigravity dashboard, open the Developer Tools by pressing `Command + Option + I` (on Mac). *(Note: Following the June 12, 2026 Google update, this shortcut is now disabled. You will need to access it via web-based debugging mode instead. Please search for instructions on how to enable this.)*
 2. Navigate to the **Sources** tab.
 3. In the left panel (you might need to click the `>>` icon), select **Snippets** and create a new snippet.
 4. Enter the following code into the snippet editor:

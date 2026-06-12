@@ -35,7 +35,7 @@
 ### 第三步：配置 Antigravity
 最后，你需要让 Antigravity 去加载这些自定义脚本。
 
-1. 在 Antigravity 界面中，按下 `Command + Option + I`（Mac 系统）打开开发者工具 (Developer Tools)。
+1. 在 Antigravity 界面中，按下 `Command + Option + I`（Mac 系统）打开开发者工具 (Developer Tools)。*（注：在 2026 年 6 月 12 日 Google 更新后，该快捷键已被禁用。现在需要通过开启网页端调试模式来进行注入，具体做法请自行搜索。）*
 2. 切换到 **Sources**（源代码）标签页。
 3. 在左侧面板中（你可能需要点击 `>>` 图标），选择 **Snippets**（代码段）并创建一个新的 snippet。
 4. 在编辑器中输入以下代码：
