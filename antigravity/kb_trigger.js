@@ -25,6 +25,8 @@ export function initKbTrigger() {
         return dropdownContainer;
     }
 
+    let selectedIndex = -1;
+
     function renderRules(rules) {
         if (!dropdownContainer) return;
         dropdownContainer.innerHTML = '';
@@ -34,27 +36,43 @@ export function initKbTrigger() {
             return;
         }
 
+        selectedIndex = 0;
+
         rules.forEach((rule, index) => {
             const item = document.createElement('div');
-            item.className = 'flex w-full px-2 py-1.5 items-center gap-2 cursor-pointer hover:bg-secondary/80 transition-colors';
+            // 移除 hover:bg-secondary/80, 改用 JS 控制 bg-secondary
+            item.className = 'flex w-full px-2 py-1.5 items-center gap-2 cursor-pointer transition-colors';
             item.setAttribute('role', 'option');
             item.setAttribute('id', `kb-item-${index}`);
             
-            const badgeColor = rule.scope === 'Global' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+            let badgeText = 'Local';
+            let badgeColor = 'bg-gray-500/20 text-gray-400 border-gray-500/30';
             
-            let typeBadge = '';
-            if (rule.scope === 'Local' && rule.type) {
-                const typeColor = rule.type === 'Knowledge' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-                typeBadge = `<span class="text-[10px] px-1 py-0.5 rounded border border-solid ${typeColor} shrink-0 leading-none">${rule.type}</span>`;
+            if (rule.scope === 'Global') {
+                badgeText = 'Global';
+                badgeColor = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+            } else if (rule.scope === 'Local') {
+                if (rule.type === 'Knowledge') {
+                    badgeText = 'Knowledge';
+                    badgeColor = 'bg-green-500/20 text-green-400 border-green-500/30';
+                } else {
+                    badgeText = 'Instruction';
+                    badgeColor = 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+                }
             }
-            
+
             item.innerHTML = `
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500 shrink-0"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
-                <span class="text-[10px] px-1 py-0.5 rounded border border-solid ${badgeColor} shrink-0 leading-none">${rule.scope || 'Local'}</span>
-                ${typeBadge}
+                <span class="text-[10px] px-1 py-0.5 rounded border border-solid ${badgeColor} shrink-0 leading-none">${badgeText}</span>
                 <span class="text-xs shrink-0 font-medium">${rule.tag}</span>
                 <span class="text-[11px] opacity-60 min-w-0 truncate" dir="auto">${rule.description || '知识片段'}</span>
             `;
+
+            // 鼠标悬停更新选择
+            item.addEventListener('mouseenter', () => {
+                selectedIndex = index;
+                updateSelection();
+            });
 
             item.addEventListener('mousedown', (e) => {
                 e.preventDefault(); // 防止输入框失焦
@@ -64,19 +82,43 @@ export function initKbTrigger() {
 
             dropdownContainer.appendChild(item);
         });
+
+        updateSelection();
+    }
+
+    function updateSelection() {
+        if (!dropdownContainer) return;
+        const items = dropdownContainer.querySelectorAll('div[role="option"]');
+        items.forEach((item, index) => {
+            if (index === selectedIndex) {
+                // 使用内联样式确保高亮生效，防止 Tailwind 类被剔除
+                item.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+            } else {
+                item.style.backgroundColor = 'transparent';
+            }
+        });
+        
+        const selectedEl = dropdownContainer.querySelector(`#kb-item-${selectedIndex}`);
+        if (selectedEl) {
+            selectedEl.scrollIntoView({ block: 'nearest' });
+        }
     }
 
     function insertRuleTag(rule) {
-        // Option A: 明文展开 (所见即所得)
-        const injectionText = `\n<rule name="${rule.tag}" scope="${rule.scope}">\n${rule.content}\n</rule>\n`;
-        
-        // 尝试覆盖输入框里的触发词文本 (例如 "#kbg ")
-        for (let i = 0; i < currentMatchLength; i++) {
-            document.execCommand('delete', false, null);
+        try {
+            const injectionText = `\n<rule name="${rule.tag}" scope="${rule.scope}">\n${rule.content}\n</rule>\n`;
+            
+            // 返璞归真：最简单粗暴的 delete，对 Lexical 这种接管了 Selection 的富文本引擎最为安全
+            // 每次执行 delete 都会触发原生的 beforeinput 和 input 事件，Lexical 可以完美捕捉
+            for (let i = 0; i < currentMatchLength; i++) {
+                document.execCommand('delete', false, null);
+            }
+            
+            // 插入完整规则文本
+            document.execCommand('insertText', false, injectionText);
+        } catch (e) {
+            console.error('[kb_trigger] 插入规则失败:', e);
         }
-        
-        // 插入完整规则文本
-        document.execCommand('insertText', false, injectionText);
     }
 
     function showMenu(inputElement) {
@@ -84,7 +126,6 @@ export function initKbTrigger() {
             dropdownContainer = createDropdown();
         }
         
-        // 核心修复：React 的每次重新渲染都可能会把我们注入的 DOM 节点给“偷偷删掉”
         if (!document.body.contains(dropdownContainer)) {
             const wrapper = inputElement.closest('.relative.w-full');
             if (wrapper) {
@@ -103,13 +144,52 @@ export function initKbTrigger() {
             dropdownContainer.style.display = 'none';
         }
         isMenuVisible = false;
+        selectedIndex = -1;
     }
 
-    // 核心拦截器：监听键盘输入
-    document.addEventListener('keyup', async (e) => {
-        const inputSelector = 'div[aria-label="Message input"][contenteditable="true"], div[data-lexical-editor="true"]';
+    // 监听按键导航和回车确认 (核心修复：使用 capture 捕获阶段，并且 stopImmediatePropagation 彻底阻断 React 合成事件)
+    document.addEventListener('keydown', (e) => {
+        if (!isMenuVisible || rulesData.length === 0) return;
         
-        // 兼容处理：在富文本编辑器中，触发键盘事件的 target 可能是内部的 span 或 p 标签
+        const inputSelector = 'div[aria-label="Message input"][contenteditable="true"], div[data-lexical-editor="true"]';
+        const activeEl = e.target.closest ? e.target.closest(inputSelector) : null;
+        if (!activeEl) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            selectedIndex = (selectedIndex + 1) % rulesData.length;
+            updateSelection();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            selectedIndex = (selectedIndex - 1 + rulesData.length) % rulesData.length;
+            updateSelection();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation(); // 彻底截断，防止触发发送
+            
+            if (selectedIndex >= 0 && selectedIndex < rulesData.length) {
+                const selectedRule = rulesData[selectedIndex];
+                
+                // 必须同步执行！如果用 setTimeout 会丢失用户的 Trusted Event 上下文，导致浏览器拦截 execCommand
+                insertRuleTag(selectedRule);
+                hideMenu();
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            hideMenu();
+        }
+    }, true); // <--- 注意这里的 true: 在事件捕获阶段就将其拦截
+
+    // 核心拦截器：监听键盘输入触发菜单
+    document.addEventListener('keyup', async (e) => {
+        // 忽略方向键和回车键，避免重复触发或干扰 keydown
+        if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) return;
+
+        const inputSelector = 'div[aria-label="Message input"][contenteditable="true"], div[data-lexical-editor="true"]';
         const activeEl = e.target.closest ? e.target.closest(inputSelector) : null;
         
         if (!activeEl) {
@@ -117,7 +197,6 @@ export function initKbTrigger() {
             return;
         }
 
-        // 清理富文本编辑器里经常出现的“零宽字符”和“不换行空格”
         let rawText = activeEl.textContent || '';
         let cleanText = rawText.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\u00A0/g, ' ');
 
@@ -129,7 +208,6 @@ export function initKbTrigger() {
         if (matchScope) {
             const projName = extractActiveProjectName();
             
-            // 只要不是纯本地模式，或者能拿到项目名，就可以去 fetch
             if (matchScope === 'global' || projName) {
                 if (!dropdownContainer) showMenu(activeEl);
                 dropdownContainer.innerHTML = '<div class="p-3 text-xs opacity-50 text-center">Loading rules...</div>';

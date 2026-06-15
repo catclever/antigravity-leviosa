@@ -95,6 +95,17 @@ export function initBackground() {
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
             }
 
+            /* === 5.1 原生自动补全下拉框 (Typeahead) 专属优化 === */
+            /* 让悬浮在输入框上的提示框拥有更强的质感和辨识度。
+               由于 Chrome 渲染引擎的限制，跨 Stacking Context 的元素可能无法被正确模糊，
+               所以这里适度提高背景的不透明度，防止背后的文字干扰阅读。 */
+            .absolute.w-full.bg-card.z-30 {
+                background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 20%, rgba(20, 20, 22, 0.95)) !important;
+                backdrop-filter: blur(24px) saturate(150%) !important;
+                border: 1px solid rgba(255, 255, 255, 0.15) !important;
+                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4) !important;
+            }
+
             button:hover, [role="button"]:hover {
                 background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 50%, transparent) !important;
             }
