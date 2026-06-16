@@ -91,19 +91,96 @@ function findProjectDirFast(startPaths, targetName, maxDepth = 4) {
 function findProjectDir(projectName) {
     if (!projectName) return null;
     
+    let repoName = null;
+    let subDir = projectName;
+
+    if (projectName.includes('/')) {
+        const parts = projectName.split('/');
+        repoName = parts[0];
+        subDir = parts.slice(1).join('/');
+    }
+    
     const knownPaths = getAllKnownWorkspaces();
-    for (const p of knownPaths) {
-        if (path.basename(p) === projectName) {
-            if (fs.existsSync(p) && fs.statSync(p).isDirectory()) {
-                return p;
+    const candidates = new Set();
+    
+    // 1. 如果带有 repoName，尝试严格匹配
+    if (repoName) {
+        const suffix = `/${repoName}/${subDir}`;
+        for (const p of knownPaths) {
+            if (p.endsWith(suffix) && fs.existsSync(p) && fs.statSync(p).isDirectory()) {
+                candidates.add(p);
+            }
+        }
+        
+        for (const p of knownPaths) {
+            if (path.basename(p) === repoName) {
+                const fullPath = path.join(p, subDir);
+                if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
+                    candidates.add(fullPath);
+                }
+            }
+        }
+        
+        const fallbackRepoPath = findProjectDirFast(PROJECT_ROOTS, repoName);
+        if (fallbackRepoPath) {
+            const fullPath = path.join(fallbackRepoPath, subDir);
+            if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
+                candidates.add(fullPath);
             }
         }
     }
     
-    const fallbackPath = findProjectDirFast(PROJECT_ROOTS, projectName);
-    if (fallbackPath) return fallbackPath;
+    // 2. 无论有没有 repoName，或者严格匹配失败，我们都应该把 subDir 当作独立目标去找
+    // 因为云端的 repoName 可能在本地完全不存在（例如被用户移动到了 taichi/apps 下）
+    for (const p of knownPaths) {
+        if (path.basename(p) === subDir) {
+            if (fs.existsSync(p) && fs.statSync(p).isDirectory()) {
+                candidates.add(p);
+            }
+        }
+    }
+    
+    const fallbackPath = findProjectDirFast(PROJECT_ROOTS, subDir);
+    if (fallbackPath) {
+        candidates.add(fallbackPath);
+    }
 
-    return null;
+    if (candidates.size === 0) return null;
+    if (candidates.size === 1) return Array.from(candidates)[0];
+    
+    // 3. 如果有多个候选目录，通过“特征打分”来优选
+    let bestCandidate = null;
+    let highestScore = -Infinity;
+    
+    for (const p of candidates) {
+        let score = 0;
+        
+        // 如果给定了 repoName，且该路径真的包含 repoName，给予巨大的加分（尊重全路径匹配）
+        if (repoName && p.includes(`/${repoName}/`)) {
+            score += 20;
+        }
+        
+        // 核心项目特征：存在任意一个都是强烈的项目根目录信号
+        if (fs.existsSync(path.join(p, '.git'))) score += 10;
+        if (fs.existsSync(path.join(p, '.vscode'))) score += 10;
+        if (fs.existsSync(path.join(p, '.agent'))) score += 10;
+        
+        // 次要特征
+        if (fs.existsSync(path.join(p, 'package.json'))) score += 5;
+        if (fs.existsSync(path.join(p, 'Gemfile'))) score += 5;
+        if (fs.existsSync(path.join(p, 'requirements.txt'))) score += 5;
+        
+        // 惩罚项：目录越深，分数越低（倾向于更浅的目录）
+        const depth = p.split(path.sep).length;
+        score -= depth;
+        
+        if (score > highestScore) {
+            highestScore = score;
+            bestCandidate = p;
+        }
+    }
+    
+    return bestCandidate;
 }
 
 module.exports = {

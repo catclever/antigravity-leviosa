@@ -67,18 +67,15 @@ To unlock the full potential of this extension, you'll need a local API endpoint
 This extension is designed to work seamlessly with my local **Taichi** service (currently Mac Only), which acts as the primary data source for these dynamic configurations. 
 
 1. Clone and start the Taichi service: [https://github.com/catclever/taichi](https://github.com/catclever/taichi)
-2. Simply copy the **entire** downloaded folder from Step 1 into your Taichi's local scripts directory. (This folder contains both our UI scripts and the `taichi_theme_sync.js` backend plugin that Taichi needs).
+2. Simply copy the `apps` folder from the downloaded repository into your Taichi's local scripts directory. (This will merge the `com.google.antigravity` app into your Taichi environment).
 3. Once Taichi is running locally, it automatically hosts these files and exposes the required endpoint at `http://127.0.0.1:9216`.
 4. You're good to go!
 
 #### Method 2: The DIY Mock Server
-If you don't want to pull the entire Taichi repo, no worries! You can easily spin up a tiny local mock server to satisfy the API requirements. 
+If you don't want to pull the entire Taichi repo, no worries! You can easily spin up a tiny local mock server using Node.js to satisfy the API requirements. 
 
-> *Note: If you use this method, you can completely ignore the `taichi_theme_sync.js` file included in the download, as your mock server will handle that job instead. The extension expects a GET request to `http://127.0.0.1:9216/api/script/taichi_theme_sync?project=<name>`. The path name `taichi_theme_sync` comes from the fact that it's executed as a specific script within the Taichi environment. I am simply using the exact same path here in my mock server to ensure full compatibility without having to modify the extension's code!*
-
-We have prepared two quick-start guides depending on your preferred language. Click the links below for the full scripts:
+We have prepared a quick-start guide. Click the link below for the full scripts:
 - [Using Node.js (Quick & Easy)](./mock_server_node.md)
-- [Using Python 3](./mock_server_python.md)
 
 Whichever method you choose, ensure the service is running before proceeding to the final step.
 
@@ -90,7 +87,7 @@ Finally, you need to tell the Antigravity dashboard to load these custom scripts
 3. In the left panel (you might need to click the `>>` icon), select **Snippets** and create a new snippet.
 4. Enter the following code into the snippet editor:
    ```javascript
-   import('http://127.0.0.1:9216/src/antigravity/main.js')
+   import('http://127.0.0.1:9216/src/apps/com.google.antigravity/web/main.js')
    ```
    *(Note: The port and endpoint here should match your configuration. If you used the DIY mock server in Step 2 instead of Taichi, you'll need to ensure your local server also serves the directory containing `main.js` statically at this path).*
 5. Right-click the snippet name and select **Run** (or press `Command + Enter`) to execute the code.
@@ -138,7 +135,7 @@ Adds a slick golden border and glow to the currently selected radio button optio
 ### 8. `project_opener.js` & `antigravity_open_project.js` (One-Click IDE Opener)
 Overrides the native "Open in IDE" button by injecting a customizable dropdown menu, allowing you to open the active project directly into your preferred tools (VS Code, Kitty, Finder, etc.). It supports both single directories and multi-root workspaces.
 - **Customization:** You can modify the `CONFIG.apps` array at the top of `project_opener.js` to add custom IDEs, change the default application, or update the SVG icons.
-- **Backend Requirement:** This feature relies on the local service (Taichi or Mock Server) to execute the actual shell commands. It expects the endpoint `/api/script/antigravity_open_project` to be available. If using a DIY mock server, you must implement this endpoint to handle the `open` commands.
+- **Backend Requirement:** This feature relies on the local service (Taichi or Mock Server) to execute the actual shell commands. It expects the endpoint `/api/script/apps/com.google.antigravity/worker/antigravity_open_project` to be available. If using a DIY mock server, you must implement this endpoint to handle the `open` commands.
 
 ### 9. `sidebar_reorder.js` (Sidebar Reorder)
 Reorders the sidebar layout by visually moving the "Projects" section above "Pinned Conversations". It achieves this purely through CSS `order` (`-1` and `1`), ensuring no interference with the native React Virtual DOM.

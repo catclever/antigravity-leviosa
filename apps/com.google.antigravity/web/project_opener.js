@@ -66,20 +66,6 @@ if (!window._ag_global_listener_added_v5) {
 
         if (selectedApp.isWeb) return;
 
-        const btn = e.target.closest('[data-testid^="open-editor"]');
-        if (btn && btn.id !== 'ag-app-selector-btn') {
-            if (!btn.hasAttribute('aria-haspopup') && !(btn.getAttribute('data-testid') || '').includes('multi')) {
-                e.preventDefault();
-                e.stopPropagation();
-                const proj = extractActiveProjectName() || currentProject;
-                openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace);
-                window._ag_is_waiting_for_multi_project_selection = false;
-            } else {
-                window._ag_is_waiting_for_multi_project_selection = true;
-            }
-            return;
-        }
-
         const popup = e.target.closest('[role="listbox"], [role="menu"]');
         if (popup && !popup.classList.contains('ag-dropdown-menu')) {
             const option = e.target.closest('[role="option"], [role="menuitem"]');
@@ -98,11 +84,28 @@ if (!window._ag_global_listener_added_v5) {
                     }
                     
                     if (projectName) {
-                        openProjectBackend(projectName, selectedApp.appName, !!selectedApp.supportsWorkspace);
+                        const repoName = extractActiveProjectName() || currentProject;
+                        const queryProj = (repoName && repoName !== projectName) ? `${repoName}/${projectName}` : projectName;
+                        openProjectBackend(queryProj, selectedApp.appName, !!selectedApp.supportsWorkspace);
                     }
                     setTimeout(() => { document.body.click(); }, 10);
                 }
             }
+            return;
+        }
+
+        const btn = e.target.closest('[data-testid^="open-editor"]');
+        if (btn && btn.id !== 'ag-app-selector-btn') {
+            if (!btn.hasAttribute('aria-haspopup') && !(btn.getAttribute('data-testid') || '').includes('multi')) {
+                e.preventDefault();
+                e.stopPropagation();
+                const proj = extractActiveProjectName() || currentProject;
+                openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace);
+                window._ag_is_waiting_for_multi_project_selection = false;
+            } else {
+                window._ag_is_waiting_for_multi_project_selection = true;
+            }
+            return;
         }
         
         if (!e.target.closest('[role="listbox"], [role="menu"]') && !e.target.closest('[data-testid^="open-editor"]')) {

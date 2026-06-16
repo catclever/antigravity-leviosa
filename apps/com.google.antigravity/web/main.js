@@ -12,16 +12,20 @@ import { initSessionSwitcher } from './session_switcher.js';
 
 console.log('🚀 [Antigravity Mod] 正在加载模块化组件...');
 
-// 依次激活各大功能模块
-initBackground();
-initTopbar();
-initProjectDots();
-initProjectSearch();
-initDoubleClickSubmit();
-initProjectOpener();
-initSidebarReorder();
-initArchiveHook();
-initKbTrigger();
-initSessionSwitcher();
+if (window === window.top) {
+    // 依次激活各大功能模块
+    initBackground();
+    initTopbar();
+    initProjectDots();
+    initProjectSearch();
+    initDoubleClickSubmit();
+    initProjectOpener();
+    initSidebarReorder();
+    initArchiveHook();
+    initKbTrigger();
+    initSessionSwitcher();
 
-console.log('✅ [Antigravity Mod] 所有模块加载完毕！');
+    console.log('✅ [Antigravity Mod] 所有模块加载完毕！');
+} else {
+    console.log('⏭️ [Antigravity Mod] 检测到处于 iframe 中，跳过执行。');
+}

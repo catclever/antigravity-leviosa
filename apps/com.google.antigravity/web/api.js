@@ -3,7 +3,7 @@ const L2_CACHE = new Map();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1小时的内部 L2 缓存
 
 // 【注意】如果你通过 TaiChi 暴露的端口不是 9216 或者路径不同，请在这里修改！
-const API_ENDPOINT = 'http://127.0.0.1:9216/api/script/antigravity_theme_sync'; 
+const API_ENDPOINT = 'http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_theme_sync'; 
 
 export async function fetchThemeColor(projectName) {
     if (!projectName) return null;
@@ -52,7 +52,7 @@ export async function openProjectBackend(projectName, appName, supportsWorkspace
         return;
     }
     try {
-        const url = `http://127.0.0.1:9216/api/script/antigravity_open_project?project=${encodeURIComponent(projectName)}&app=${encodeURIComponent(appName)}&supportsWorkspace=${supportsWorkspace}`;
+        const url = `http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_open_project?project=${encodeURIComponent(projectName)}&app=${encodeURIComponent(appName)}&supportsWorkspace=${supportsWorkspace}`;
         const response = await fetch(url);
         const data = await response.json();
         if (!data.success) {
@@ -69,7 +69,7 @@ export async function openProjectBackend(projectName, appName, supportsWorkspace
 
 export async function fetchKnowledgeIndex(projectName, scope = 'all') {
     try {
-        const url = `http://127.0.0.1:9216/api/script/antigravity_knowledge_index?project=${encodeURIComponent(projectName || '')}&scope=${encodeURIComponent(scope)}`;
+        const url = `http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_knowledge_index?project=${encodeURIComponent(projectName || '')}&scope=${encodeURIComponent(scope)}`;
         const response = await fetch(url);
         const data = await response.json();
         if (data.success && data.rules) {

@@ -2,79 +2,42 @@
 
 **Using Node.js (Quick & Easy):**
 
-1. Initialize a new folder and install dependencies:
+Because the repository's backend logic has been restructured into modular async functions in the `worker` directory, building a mock server is now incredibly simple. You just need an Express server to route requests directly to these worker scripts!
+
+1. Inside the downloaded repository folder (the one containing the `apps` directory), initialize a new project and install dependencies:
    ```bash
    npm init -y
    npm install express cors
    ```
-2. Create a `server.js` file:
+2. Create a `server.js` file in the same directory:
    ```javascript
    const express = require('express');
    const cors = require('cors');
-   const fs = require('fs');
    const path = require('path');
    const app = express();
 
    app.use(cors());
 
-   // Configuration: Add the absolute paths to the directories where your projects are stored
-   const PROJECT_ROOTS = [
-       '/Users/YourName/Projects',
-       '/Users/YourName/Documents',
-       '/Users/YourName/workbench'
-   ];
+   // Serve static UI scripts from the web directory
+   app.use('/src/apps/com.google.antigravity/web', express.static(path.join(__dirname, 'apps/com.google.antigravity/web')));
 
-   app.get('/api/script/taichi_theme_sync', (req, res) => {
-       const projectParam = req.query.project;
-       let color = '#999999'; // Default fallback color
-       
-       if (projectParam) {
-           // 1. Handle VS Code Multi-Root Workspaces (comma-separated names)
-           const subProjects = projectParam.split(',').map(p => p.trim()).filter(Boolean);
+   // Route API requests to the worker modules
+   app.get('/api/script/apps/com.google.antigravity/worker/:scriptName', async (req, res) => {
+       try {
+           const scriptPath = path.join(__dirname, 'apps/com.google.antigravity/worker', req.params.scriptName + '.js');
            
-           for (const project of subProjects) {
-               for (const root of PROJECT_ROOTS) {
-                   let settingsPath = path.join(root, project, '.vscode', 'settings.json');
-                   
-                   // 2. Exact Match Check
-                   if (!fs.existsSync(settingsPath)) {
-                       // 3. Fallback: Fuzzy Match (find directory containing the name)
-                       if (fs.existsSync(root)) {
-                           try {
-                               const items = fs.readdirSync(root, { withFileTypes: true });
-                               for (const item of items) {
-                                   if (item.isDirectory() && item.name.includes(project)) {
-                                       const fuzzyPath = path.join(root, item.name, '.vscode', 'settings.json');
-                                       if (fs.existsSync(fuzzyPath)) {
-                                           settingsPath = fuzzyPath;
-                                           break;
-                                       }
-                                   }
-                               }
-                           } catch (e) {}
-                       }
-                   }
-
-                   // If we found a valid settings file, extract the color
-                   if (fs.existsSync(settingsPath)) {
-                       try {
-                           const content = fs.readFileSync(settingsPath, 'utf8');
-                           // Using regex to safely extract the color, avoiding JSON.parse errors due to comments
-                           const match = content.match(/"peacock\.color"\s*:\s*"([^"]+)"/);
-                           if (match) {
-                               color = match[1];
-                               break; // Stop searching root directories if color is found
-                           }
-                       } catch (e) {
-                           console.error(`Error reading settings for ${project}:`, e);
-                       }
-                   }
-               }
-               if (color !== '#999999') break; // Stop searching sub-projects if color is found
-           }
+           // Dynamically require the worker script
+           const workerModule = require(scriptPath);
+           
+           // Execute the exported async function with the query parameters
+           const result = await workerModule(req.query);
+           
+           // Return the JSON response
+           res.json(result);
+       } catch (e) {
+           console.error(`Error executing ${req.params.scriptName}:`, e);
+           res.status(500).json({ success: false, error: e.message });
        }
-
-       res.json({ success: true, color: color });
    });
 
    app.listen(9216, '127.0.0.1', () => console.log('Mock server running on port 9216!'));
