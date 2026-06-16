@@ -108,11 +108,11 @@ This is the conductor that imports and initializes all other modules.
 - **Customization:** If you don't like a specific feature (e.g., the background image), you can easily disable it by simply commenting out its `initX()` function call. This is also the place to import and initialize any of your own custom feature scripts!
 
 ### 2. `api.js` (The Data Bridge)
-Handles the communication between the dashboard and your local data source (Taichi or Mock Server) to fetch project theme colors.
-- **Caching:** To keep the UI snappy and avoid spamming your local service, this module features a built-in L2 memory cache with a Time-To-Live (TTL) of **1 hour**.
-- **Color Extraction Mechanism:** The theme colors depend on the `.vscode/settings.json` located in your local project folders. When requesting colors, the backend script employs a highly robust zero-config scanning mechanism:
+Handles all communication between the dashboard and your local data source (Taichi or Mock Server). Rather than just fetching colors, it acts as a universal bridge calling various modular scripts located in the `worker/` directory (e.g., triggering IDE openings, fetching knowledge indexes, and retrieving theme colors).
+- **Caching:** For expensive operations like theme lookups, it features a built-in L2 memory cache with a Time-To-Live (TTL) of **1 hour** to keep the UI snappy.
+- **Robust Path Resolution:** When worker scripts (like theme syncing) need to find your actual local project folders, they rely on a powerful `project_resolver.js` utility in the backend:
   1. **Multi-Root Workspace Parsing:** It splits comma-separated project names and scans each sub-project sequentially.
-  2. **SQLite Exact Matching:** It directly queries the IDE's local SQLite database (`state.vscdb`) to fetch the absolute paths of your recently opened workspaces. This ensures `O(1)` precision and gracefully handles duplicate folder names without requiring any manual path configuration!
+  2. **SQLite Exact Matching:** It directly queries the IDE's local SQLite database (`state.vscdb`) to fetch the absolute paths of your recently opened workspaces. This ensures `O(1)` precision without requiring any manual path configuration!
   3. **Fuzzy Fallback:** If the exact path isn't found in the database, it falls back to a fuzzy search across common fallback directories.
 
 ### 3. `background.js` (Workspace Background)
