@@ -139,7 +139,7 @@ export function initArchiveHook() {
             if (uuid) {
                 console.log(`[Antigravity Mod] 监听到浅层归档动作，UUID: ${uuid}，触发浅层清理...`);
                 try {
-                    const url = `http://127.0.0.1:9216/api/script/archive_brain?action=shallow&uuid=${uuid}&title=${encodeURIComponent(title)}&project=${encodeURIComponent(project)}`;
+                    const url = `http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/archive_brain?action=shallow&uuid=${uuid}&title=${encodeURIComponent(title)}&project=${encodeURIComponent(project)}`;
                     const res = await fetch(url);
                     const data = await res.json();
                     if (data.success) {
@@ -213,7 +213,7 @@ export function initArchiveHook() {
 
                         if (!info.uuid && info.title !== 'N/A') {
                             console.log(`[Antigravity Mod] DOM 提取失败，启动账本兜底查询 (Title: ${info.title})`);
-                            const lookupUrl = `http://127.0.0.1:9216/api/script/archive_brain?action=lookup&title=${encodeURIComponent(info.title)}`;
+                            const lookupUrl = `http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/archive_brain?action=lookup&title=${encodeURIComponent(info.title)}`;
                             fetch(lookupUrl).then(res => res.json()).then(lookupData => {
                                 if (lookupData.success && lookupData.uuid) {
                                     console.log(`[Antigravity Mod] 账本兜底成功！找到 UUID: ${lookupData.uuid}`);
@@ -251,7 +251,7 @@ export function initArchiveHook() {
 
                         function triggerPopupDeepArchive(info, deepBtn, deleteBtn) {
                             console.log(`[Antigravity Mod] 触发深层归档 (弹窗按钮), UUID: ${info.uuid}`);
-                            const url = `http://127.0.0.1:9216/api/script/archive_brain?action=deep&uuid=${info.uuid}&title=${encodeURIComponent(info.title)}&project=${encodeURIComponent(info.project)}`;
+                            const url = `http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/archive_brain?action=deep&uuid=${info.uuid}&title=${encodeURIComponent(info.title)}&project=${encodeURIComponent(info.project)}`;
                             
                             fetch(url).then(res => res.json()).then(data => {
                                 if (data.success) {
