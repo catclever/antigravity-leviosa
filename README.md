@@ -140,8 +140,16 @@ Overrides the native "Open in IDE" button by injecting a customizable dropdown m
 ### 9. `sidebar_reorder.js` (Sidebar Reorder)
 Reorders the sidebar layout by visually moving the "Projects" section above "Pinned Conversations". It achieves this purely through CSS `order` (`-1` and `1`), ensuring no interference with the native React Virtual DOM.
 
-### 10. `agy_archive.js` & `archive_hook.js` (Shallow Archive Tool)
-A Node.js CLI utility that manages local disk usage by cleaning up verbose `.system_generated` logs and `scratch` directories within individual `brain` folders. It compresses the cleaned files into `.tar.gz` archives and maintains an `archive_index.json` metadata record.
+### 10. `archive_brain.js` & `archive_hook.js` (Shallow Archive Tool)
+An intelligent archiving module that manages local disk usage by cleaning up verbose `.system_generated` logs and `scratch` directories within individual `brain` folders. It compresses the cleaned files into `.tar.gz` archives and maintains an `archive_index.json` metadata record. It now runs fully asynchronously as a backend Worker script.
+
+### 11. `kb_trigger.js` & `antigravity_knowledge_index.js` (Knowledge Base Injector)
+A powerful feature that lets you instantly inject knowledge fragments into your chat prompt. Simply type `#kb ` (for all), `#kbg ` (for global), or `#kbl ` (for local) in the message input box to trigger a beautiful dropdown menu containing your reusable markdown knowledge files. Select an item, and it's instantly formatted and injected into your prompt!
+- **Global Scope:** Reads from `~/.gemini/kb/*.md`
+- **Local Scope:** Reads from `<project_dir>/.agent/kb/*.md`
+
+### 12. `session_switcher.js` (Fast Session Switcher)
+Brings the standard browser tab-switching experience to the Antigravity sidebar! Use `Ctrl + Tab` to cycle to the next active project session, and `Ctrl + Shift + Tab` to cycle to the previous one. It intelligently calculates the DOM position to ensure smooth scrolling.
 
 ## Todos
 - 🐱 **KitiGravity**: God might have given us a hundred ways to open a terminal, but who could possibly resist summoning a kitty with a single click?<br>**🐱 KitiGravity**：虽然上帝给了100种打开终端的方式，但是谁能拒绝一键召唤小猫呢？
