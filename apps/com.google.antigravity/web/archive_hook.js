@@ -94,8 +94,8 @@ export function initArchiveHook() {
                 // 向上遍历虚拟 DOM 树，最多找 15 层
                 while (fiber && attempts < 15) {
                     if (fiber.memoizedProps) {
-                        // 打印出来看看里面的结构，方便分析为什么之前找不到
-                        console.log('[Antigravity Mod] 尝试解析 Fiber Props (Level ' + attempts + '):', fiber.memoizedProps);
+                        // 避免刷屏，注释掉高频的打印
+                        // console.log('[Antigravity Mod] 尝试解析 Fiber Props (Level ' + attempts + '):', fiber.memoizedProps);
                         
                         const foundUUID = fastSearchUUID(fiber.memoizedProps, metadata.title);
                         if (foundUUID) {

@@ -80,3 +80,19 @@ export async function fetchKnowledgeIndex(projectName, scope = 'all') {
     }
     return [];
 }
+
+export async function openFileInFinderBackend(projectName, filePath, absolutePath = '') {
+    if (!projectName && !absolutePath) return;
+    try {
+        const url = `http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_open_file_in_finder?project=${encodeURIComponent(projectName || '')}&file=${encodeURIComponent(filePath || '')}&fullPath=${encodeURIComponent(absolutePath || '')}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (!data.success) {
+            console.error('[Antigravity Mod] 在 Finder 中打开文件失败:', data.error);
+        } else {
+            console.log(`[Antigravity Mod] 成功在 Finder 中打开文件: ${absolutePath || filePath}`);
+        }
+    } catch (err) {
+        console.error(`[Antigravity Mod] 调用后端打开文件失败`, err);
+    }
+}

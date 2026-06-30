@@ -9,6 +9,7 @@ import { initSidebarReorder } from './sidebar_reorder.js';
 import { initArchiveHook } from './archive_hook.js';
 import { initKbTrigger } from './kb_trigger.js';
 import { initSessionSwitcher } from './session_switcher.js';
+import { initOpenPathInFinder } from './open_path_in_finder.js';
 
 console.log('🚀 [Antigravity Mod] 正在加载模块化组件...');
 
@@ -24,6 +25,7 @@ if (window === window.top) {
     initArchiveHook();
     initKbTrigger();
     initSessionSwitcher();
+    initOpenPathInFinder();
 
     console.log('✅ [Antigravity Mod] 所有模块加载完毕！');
 } else {

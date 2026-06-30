@@ -9,7 +9,13 @@ module.exports = async function(query) {
 
     const titleB64 = Buffer.from(title).toString('base64');
     const projectB64 = Buffer.from(project).toString('base64');
-    const scriptPath = path.join(__dirname, 'antigravity', 'agy_archive.js');
+    /*
+     * [Bug Fix Document]
+     * 1. Problem: Deep archive failed with `MODULE_NOT_FOUND` because `scriptPath` pointed to `worker/antigravity/agy_archive.js`, which does not exist.
+     * 2. Method: Corrected `scriptPath` to point to `../web/agy_archive.js`, which is the actual location of the archive script.
+     * 3. Caveat: If the location of `agy_archive.js` changes in the future (e.g. moved from web/ to worker/), this path must be updated accordingly.
+     */
+    const scriptPath = path.join(__dirname, '..', 'web', 'agy_archive.js');
 
     let command = '';
 

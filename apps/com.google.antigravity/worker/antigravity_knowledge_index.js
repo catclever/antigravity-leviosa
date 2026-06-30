@@ -25,7 +25,7 @@ module.exports = async function(query) {
         try {
             const files = fs.readdirSync(dirPath);
             for (const file of files) {
-                if (file.endsWith('.md')) {
+                if (file.endsWith('.md') && !file.startsWith('.')) {
                     const filePath = path.join(dirPath, file);
                     const content = fs.readFileSync(filePath, 'utf-8');
                     const tag = file.replace('.md', '');
