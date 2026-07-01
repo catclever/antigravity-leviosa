@@ -5,7 +5,14 @@ const TOPBAR_BG_VAR = "--topbar-bg-color";
 const TOPBAR_TEXT_VAR = "--topbar-text-color";
 let currentProject = "";
 
+/*
+ * [Bug Fix Document]
+ * 1. Problem: When the main titlebar is empty, the project name is missing, leading to the color not being fetched or updated.
+ * 2. Method: Added a fallback selector `span.truncate.flex-1.min-w-0` to extract the project name from the sidebar if it's missing from the main titlebar.
+ * 3. Caveat: If the sidebar UI structure changes, this fallback will fail. We rely on the specific class structure of the sidebar item.
+ */
 function extractActiveProjectName() {
+    // 1. 优先尝试从顶部标题栏提取
     const spans = document.querySelectorAll('span.truncate.inline-block');
     for (let span of spans) {
         const parent = span.parentElement;
@@ -16,6 +23,13 @@ function extractActiveProjectName() {
             }
         }
     }
+
+    // 2. 备选：从侧边栏等位置提取（应对标题栏为空时）
+    const fallbackSpan = document.querySelector('span.truncate.flex-1.min-w-0');
+    if (fallbackSpan) {
+        return fallbackSpan.textContent.trim();
+    }
+
     return null;
 }
 
@@ -35,11 +49,19 @@ export function initTopbar() {
     // 注入顶栏变色的 CSS 样式
     const style = document.createElement('style');
     style.textContent = `
-        /* 合并你提供的两个复杂的选择器结构，以及保留基础备选 */
+        /*
+         * [Bug Fix Document]
+         * 1. Problem: The previous CSS selectors targeting the topbar were extremely fragile (e.g., #root > div...) and broke when the DOM structure updated. Furthermore, relying purely on buttons failed when the titlebar was empty.
+         * 2. Method: Replaced fragile DOM paths with robust characteristic-based selectors using :has() and [style*="app-region: drag"] to capture the structural layout directly.
+         * 3. Caveat: If the application removes or alters these specific attributes (data-testid, app-region), the topbar will lose its customized background color again.
+         */
+        /* 智能追踪特征选择器（兼容旧版备选） */
+        div.shrink-0[style*="app-region: drag"],
+        div.select-none.justify-between[style*="app-region: drag"],
+        div.select-none.justify-between:has(button[data-testid="titlebar-more-actions"]),
+        div.border-b:has(> button[data-tab-id="overview"]),
         header, [data-test-id="chat-header"], .top-bar-class,
-        div:has(> button[data-testid="close-aux-pane"]),
-        #root > div > div > div > div > div > div.h-screen.w-screen.flex.flex-col.bg-background.text-foreground > div > div > div:nth-child(2) > div > div.border-border.flex > div > div.flex-1.flex.flex-col.min-w-0.h-full > div.shrink-0,
-        #root > div > div > div > div > div > div.h-screen.w-screen.flex.flex-col.bg-background.text-foreground > div > div > div.border-border.flex > div > div.h-full.w-full.flex.flex-col.pb-2.bg-sidebar > div.shrink-0.flex.items-center.pr-2.mb-3 {
+        div:has(> button[data-testid="close-aux-pane"]) {
             background-color: var(--topbar-bg-color, transparent) !important;
             color: var(--topbar-text-color, inherit) !important;
             transition: background-color 0.3s ease, color 0.3s ease;
