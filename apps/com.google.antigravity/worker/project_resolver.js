@@ -183,8 +183,40 @@ function findProjectDir(projectName) {
     return bestCandidate;
 }
 
+function findProjectDirByUUID(uuid) {
+    if (!uuid) return null;
+    try {
+        const pbPath = path.join(process.env.HOME, '.gemini/antigravity/agyhub_summaries_proto.pb');
+        if (!fs.existsSync(pbPath)) return null;
+
+        const data = fs.readFileSync(pbPath);
+        const idBuf = Buffer.from(uuid);
+        let idx = data.indexOf(idBuf);
+        while (idx !== -1) {
+            const afterId = data.slice(idx);
+            const fileIdx = afterId.indexOf(Buffer.from('file:///'));
+            if (fileIdx !== -1 && fileIdx < 500) {
+                const pathStart = fileIdx + 7;
+                let pathEnd = pathStart;
+                while (pathEnd < afterId.length && afterId[pathEnd] >= 32 && afterId[pathEnd] <= 126 && afterId[pathEnd] !== 34 && afterId[pathEnd] !== 39) {
+                    pathEnd++;
+                }
+                const extracted = afterId.slice(pathStart, pathEnd).toString();
+                if (fs.existsSync(extracted) && fs.statSync(extracted).isDirectory()) {
+                    return extracted;
+                }
+            }
+            idx = data.indexOf(idBuf, idx + 1);
+        }
+    } catch (e) {
+        console.error('[Antigravity Mod] Error resolving UUID from DB:', e);
+    }
+    return null;
+}
+
 module.exports = {
     findProjectDir,
+    findProjectDirByUUID,
     getAllKnownWorkspaces,
     findProjectDirFast,
     PROJECT_ROOTS

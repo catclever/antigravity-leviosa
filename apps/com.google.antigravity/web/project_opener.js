@@ -86,7 +86,8 @@ if (!window._ag_global_listener_added_v5) {
                     if (projectName) {
                         const repoName = extractActiveProjectName() || currentProject;
                         const queryProj = (repoName && repoName !== projectName) ? `${repoName}/${projectName}` : projectName;
-                        openProjectBackend(queryProj, selectedApp.appName, !!selectedApp.supportsWorkspace);
+                        const uuid = extractActiveUUID();
+                        openProjectBackend(queryProj, selectedApp.appName, !!selectedApp.supportsWorkspace, uuid);
                     }
                     setTimeout(() => { document.body.click(); }, 10);
                 }
@@ -100,7 +101,8 @@ if (!window._ag_global_listener_added_v5) {
                 e.preventDefault();
                 e.stopPropagation();
                 const proj = extractActiveProjectName() || currentProject;
-                openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace);
+                const uuid = extractActiveUUID();
+                openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace, uuid);
                 window._ag_is_waiting_for_multi_project_selection = false;
             } else {
                 window._ag_is_waiting_for_multi_project_selection = true;
@@ -207,6 +209,22 @@ export function extractActiveProjectName() {
         }
     }
     
+    return null;
+}
+
+export function extractActiveUUID() {
+    // 1. Try URL first
+    const match = window.location.pathname.match(/\\/c\\/([a-f0-9\\-]{36})/i);
+    if (match) return match[1];
+
+    // 2. Try DOM fallback
+    const activeBtn = document.querySelector('div[role="button"].bg-sidebar-secondary');
+    if (activeBtn) {
+        const pill = activeBtn.querySelector('span[data-testid^="convo-pill-"]');
+        if (pill) {
+            return pill.getAttribute('data-testid').replace('convo-pill-', '');
+        }
+    }
     return null;
 }
 

@@ -46,13 +46,13 @@ export function getLuminance(hex) {
     return 0;
 }
 
-export async function openProjectBackend(projectName, appName, supportsWorkspace) {
+export async function openProjectBackend(projectName, appName, supportsWorkspace, uuid = null) {
     if (!projectName) {
         alert("⚠️ Antigravity: 无法获取当前项目名称，请确认你在某个项目目录中！");
         return;
     }
     try {
-        const url = `http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_open_project?project=${encodeURIComponent(projectName)}&app=${encodeURIComponent(appName)}&supportsWorkspace=${supportsWorkspace}`;
+        const url = `http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_open_project?project=${encodeURIComponent(projectName)}&app=${encodeURIComponent(appName)}&supportsWorkspace=${supportsWorkspace}${uuid ? `&uuid=${encodeURIComponent(uuid)}` : ''}`;
         const response = await fetch(url);
         const data = await response.json();
         if (!data.success) {

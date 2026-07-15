@@ -1,26 +1,40 @@
 const fs = require('fs');
 const path = require('path');
-const { findProjectDir } = require('./project_resolver');
+const { findProjectDir, findProjectDirByUUID } = require('./project_resolver');
 
 module.exports = async function(query) {
     const project = query.project ? decodeURIComponent(query.project) : '';
     const appName = query.app ? decodeURIComponent(query.app) : 'Visual Studio Code';
     const supportsWorkspace = query.supportsWorkspace === 'true';
 
+    const uuid = query.uuid ? decodeURIComponent(query.uuid) : null;
     const logFile = '/tmp/ag_open.log';
-    fs.appendFileSync(logFile, `\n[${new Date().toISOString()}] Received project: "${project}", app: "${appName}"\n`);
+    fs.appendFileSync(logFile, `\n[${new Date().toISOString()}] Received project: "${project}", uuid: "${uuid}", app: "${appName}"\n`);
 
-    if (!project) {
-        return { error: 'Missing project parameter' };
+    if (!project && !uuid) {
+        return { error: 'Missing project and uuid parameters' };
     }
 
-    const subProjects = project.split(',').map(p => p.trim()).filter(Boolean);
     const validPaths = [];
 
-    for (const subProject of subProjects) {
-        const dirPath = findProjectDir(subProject);
-        if (dirPath && !validPaths.includes(dirPath)) {
-            validPaths.push(dirPath);
+    // 1. Try exact UUID match first
+    if (uuid) {
+        const exactPath = findProjectDirByUUID(uuid);
+        if (exactPath) {
+            validPaths.push(exactPath);
+            fs.appendFileSync(logFile, `[Antigravity Mod] UUID matched exact path: ${exactPath}\n`);
+        }
+    }
+
+    // 2. Fallback to old heuristic if UUID didn't work
+    if (validPaths.length === 0 && project) {
+        fs.appendFileSync(logFile, `[Antigravity Mod] Falling back to fuzzy search for project: ${project}\n`);
+        const subProjects = project.split(',').map(p => p.trim()).filter(Boolean);
+        for (const subProject of subProjects) {
+            const dirPath = findProjectDir(subProject);
+            if (dirPath && !validPaths.includes(dirPath)) {
+                validPaths.push(dirPath);
+            }
         }
     }
 
