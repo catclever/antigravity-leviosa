@@ -184,34 +184,45 @@ function findProjectDir(projectName) {
 }
 
 function findProjectDirByUUID(uuid) {
-    if (!uuid) return null;
+    if (!uuid) return [];
+    const validPaths = [];
     try {
         const pbPath = path.join(process.env.HOME, '.gemini/antigravity/agyhub_summaries_proto.pb');
-        if (!fs.existsSync(pbPath)) return null;
+        if (!fs.existsSync(pbPath)) return [];
 
         const data = fs.readFileSync(pbPath);
         const idBuf = Buffer.from(uuid);
         let idx = data.indexOf(idBuf);
-        while (idx !== -1) {
-            const afterId = data.slice(idx);
-            const fileIdx = afterId.indexOf(Buffer.from('file:///'));
-            if (fileIdx !== -1 && fileIdx < 500) {
-                const pathStart = fileIdx + 7;
+        if (idx !== -1) {
+            const limit = Math.min(idx + 5000, data.length);
+            const afterId = data.slice(idx, limit);
+            
+            let searchLimit = afterId.length;
+            const nextDollar = afterId.indexOf(Buffer.from('$'), 10);
+            if (nextDollar !== -1) searchLimit = nextDollar;
+            
+            let fIdx = 0;
+            while ((fIdx = afterId.indexOf(Buffer.from('file:///'), fIdx)) !== -1) {
+                if (fIdx > searchLimit) break;
+                
+                const pathStart = fIdx + 7;
                 let pathEnd = pathStart;
                 while (pathEnd < afterId.length && afterId[pathEnd] >= 32 && afterId[pathEnd] <= 126 && afterId[pathEnd] !== 34 && afterId[pathEnd] !== 39) {
                     pathEnd++;
                 }
                 const extracted = afterId.slice(pathStart, pathEnd).toString();
                 if (fs.existsSync(extracted) && fs.statSync(extracted).isDirectory()) {
-                    return extracted;
+                    if (!validPaths.includes(extracted)) {
+                        validPaths.push(extracted);
+                    }
                 }
+                fIdx = pathEnd;
             }
-            idx = data.indexOf(idBuf, idx + 1);
         }
     } catch (e) {
         console.error('[Antigravity Mod] Error resolving UUID from DB:', e);
     }
-    return null;
+    return validPaths;
 }
 
 module.exports = {

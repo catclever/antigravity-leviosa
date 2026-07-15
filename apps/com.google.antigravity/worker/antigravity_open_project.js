@@ -19,10 +19,23 @@ module.exports = async function(query) {
 
     // 1. Try exact UUID match first
     if (uuid) {
-        const exactPath = findProjectDirByUUID(uuid);
-        if (exactPath) {
-            validPaths.push(exactPath);
-            fs.appendFileSync(logFile, `[Antigravity Mod] UUID matched exact path: ${exactPath}\n`);
+        const exactPaths = findProjectDirByUUID(uuid);
+        if (exactPaths && exactPaths.length > 0) {
+            let matched = false;
+            if (project && project.includes('/')) {
+                // User selected a specific sub-project from the dropdown
+                const subDir = project.split('/').slice(1).join('/');
+                const matchedPath = exactPaths.find(p => p.endsWith(subDir) || p.endsWith('/' + subDir));
+                if (matchedPath) {
+                    validPaths.push(matchedPath);
+                    fs.appendFileSync(logFile, `[Antigravity Mod] UUID matched exact sub-project path: ${matchedPath}\n`);
+                    matched = true;
+                }
+            }
+            if (!matched) {
+                validPaths.push(...exactPaths);
+                fs.appendFileSync(logFile, `[Antigravity Mod] UUID matched exact path(s): ${exactPaths.join(', ')}\n`);
+            }
         }
     }
 
