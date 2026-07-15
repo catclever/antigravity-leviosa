@@ -214,7 +214,7 @@ export function extractActiveProjectName() {
 
 export function extractActiveUUID() {
     // 1. Try URL first
-    const match = window.location.pathname.match(/\\/c\\/([a-f0-9\\-]{36})/i);
+    const match = window.location.pathname.match(new RegExp('/c/([a-f0-9\\\\-]{36})', 'i'));
     if (match) return match[1];
 
     // 2. Try DOM fallback
