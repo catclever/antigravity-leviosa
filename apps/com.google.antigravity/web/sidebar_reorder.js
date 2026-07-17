@@ -6,7 +6,7 @@ export function initSidebarReorder() {
     const applyOrder = () => {
         const h2Elements = Array.from(document.querySelectorAll('h2'));
         const pinnedHeader = h2Elements.find(el => el.textContent.includes('Pinned Conversations'));
-        const projectsHeader = h2Elements.find(el => el.textContent.includes('Projects'));
+        const projectsHeader = h2Elements.find(el => el.textContent === 'Conversations' || el.textContent.includes('Projects'));
         
         if (!pinnedHeader || !projectsHeader) return;
 
