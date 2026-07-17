@@ -106,6 +106,15 @@ export function initBackground() {
                 box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4) !important;
             }
 
+            /* 优化列表项（如下拉框/斜杠菜单）的激活或选中状态，采用金色发光边框以增强辨识度 */
+            div.cursor-pointer.bg-secondary {
+                border-color: #FFD700 !important;
+                box-shadow: 0 0 8px rgba(255, 215, 0, 0.4) !important;
+                background-color: rgba(255, 215, 0, 0.15) !important;
+                border-radius: 6px !important;
+                transition: all 0.2s ease-in-out;
+            }
+
             button:hover, [role="button"]:hover {
                 background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 50%, transparent) !important;
             }
