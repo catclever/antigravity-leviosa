@@ -59,7 +59,7 @@ export function initTopbar() {
         div.shrink-0[style*="app-region: drag"],
         div.select-none.justify-between[style*="app-region: drag"],
         div.select-none.justify-between:has(button[data-testid="titlebar-more-actions"]),
-        div.border-b:has(> button[data-tab-id="overview"]),
+        div.border-b:has(button[data-tab-id="overview"]),
         header, [data-test-id="chat-header"], .top-bar-class,
         div:has(> button[data-testid="close-aux-pane"]) {
             background-color: var(--topbar-bg-color, transparent) !important;
