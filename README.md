@@ -124,7 +124,7 @@ Dynamically changes the topbar's background color based on the project you are c
 
 ### 5. `project_dots.js` (Project Indicators)
 Adds a slick, colored indicator dot next to the project names in the sidebar or subtitles, giving you a quick visual cue of your current project context.
-- **⚠️ Limitation:** Please note that this feature currently only works if your Antigravity conversation list is set to **"No Grouping"** and uses the **"Workspace"** as the subtitle.
+- **Compatibility:** Fully supports both the classic ChatGPT sidebar and the newly updated flexible DOM structures.
 
 ### 6. `project_search.js` (Project Filter)
 Injects a highly responsive search box directly into the project selection popover dialog. Since the new dashboard groups conversations into a massive list, this makes filtering and finding your specific project a breeze!
@@ -133,12 +133,12 @@ Injects a highly responsive search box directly into the project selection popov
 Adds a slick golden border and glow to the currently selected radio button options in dialogs, making it much clearer what you have selected. More importantly, it introduces a "click-again to submit" behavior: if you click an already-selected radio option, it will automatically find and trigger the "Submit" button for you. This dramatically speeds up interactions when dealing with multiple-choice workflows!
 
 ### 8. `project_opener.js` & `antigravity_open_project.js` (One-Click IDE Opener)
-Overrides the native "Open in IDE" button by injecting a customizable dropdown menu, allowing you to open the active project directly into your preferred tools (VS Code, Kitty, Finder, etc.). It supports both single directories and multi-root workspaces.
+Overrides the native "Open Editor" or "Install IDE" button by injecting a customizable dropdown menu, allowing you to open the active project directly into your preferred tools (VS Code, Kitty, Finder, etc.). It supports both single directories and multi-root workspaces. It intelligently hides the Antigravity web IDE option from the menu if you haven't installed it.
 - **Customization:** You can modify the `CONFIG.apps` array at the top of `project_opener.js` to add custom IDEs, change the default application, or update the SVG icons.
 - **Backend Requirement:** This feature relies on the local service (Taichi or Mock Server) to execute the actual shell commands. It expects the endpoint `/api/script/apps/com.google.antigravity/worker/antigravity_open_project` to be available. If using a DIY mock server, you must implement this endpoint to handle the `open` commands.
 
-### 9. `sidebar_reorder.js` (Sidebar Reorder)
-Reorders the sidebar layout by visually moving the "Projects" section above "Pinned Conversations". It achieves this purely through CSS `order` (`-1` and `1`), ensuring no interference with the native React Virtual DOM.
+### 9. `sidebar_reorder.js` (Sidebar Reorder & Pinned Collapse)
+Enhances the sidebar layout and behavior. It intelligently injects a toggle button allowing you to collapse and fold the "Pinned Conversations" section, keeping your sidebar clean. It achieves this dynamic hiding and shifting through CSS overrides and `MutationObserver`, ensuring perfect visual consistency without interfering with the native React Virtual DOM.
 
 ### 10. `archive_brain.js` & `archive_hook.js` (Shallow Archive Tool)
 An intelligent archiving module that manages local disk usage by cleaning up verbose `.system_generated` logs and `scratch` directories within individual `brain` folders. It compresses the cleaned files into `.tar.gz` archives and maintains an `archive_index.json` metadata record. It now runs fully asynchronously as a backend Worker script.
