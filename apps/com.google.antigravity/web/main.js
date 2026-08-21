@@ -5,7 +5,6 @@ import { initBackground } from './background.js';
 import { initProjectSearch } from './project_search.js';
 import { initDoubleClickSubmit } from './double_click_submit.js';
 import { initProjectOpener } from './project_opener.js';
-import { initSidebarReorder } from './sidebar_reorder.js';
 import { initArchiveHook } from './archive_hook.js';
 import { initKbTrigger } from './kb_trigger.js';
 import { initSessionSwitcher } from './session_switcher.js';
@@ -21,7 +20,6 @@ if (window === window.top) {
     initProjectSearch();
     initDoubleClickSubmit();
     initProjectOpener();
-    initSidebarReorder();
     initArchiveHook();
     initKbTrigger();
     initSessionSwitcher();
