@@ -25,8 +25,8 @@
 - 🚀 **One-Click IDE Opener**: Replaces the native IDE button with a slick multi-app dropdown menu. Open any project directly in VS Code, Kitty terminal, or Finder with a single click!<br>
   🚀 **一键闪现 IDE**：无缝接管原生的打开按钮，注入多应用下拉菜单。一键直达 VS Code、Kitty 终端或者 Finder，告别繁琐的路径跳转！
 
-- 📦 **Shallow Archive Tool**: Intelligently cleans up and compresses old agent logs to save disk space.<br>
-  📦 **轻量归档工具**：智能清理并压缩旧的 Agent 日志，拯救你的磁盘空间。
+- 📦 **Deep & Shallow Archive Tool**: Intelligently cleans up and compresses old agent logs (both shallow and deep) to save disk space.<br>
+  📦 **深/浅度归档工具**：智能清理并压缩旧的 Agent 日志，提供深浅双模式，拯救你的磁盘空间。
 
 - 🧠 **Knowledge Base Injector**: Type `#kb` to instantly inject markdown knowledge fragments directly into your prompt!<br>
   🧠 **知识库注入器**：输入 `#kb` 即可瞬间将 markdown 知识片段注入到你的提示词中！
@@ -146,7 +146,7 @@ Overrides the native "Open Editor" or "Install IDE" button by injecting a custom
 - **Customization:** You can modify the `CONFIG.apps` array at the top of `project_opener.js` to add custom IDEs, change the default application, or update the SVG icons.
 - **Backend Requirement:** This feature relies on the local service (Taichi or Mock Server) to execute the actual shell commands. It expects the endpoint `/api/script/apps/com.google.antigravity/worker/antigravity_open_project` to be available. If using a DIY mock server, you must implement this endpoint to handle the `open` commands.
 
-### 9. `archive_brain.js` & `archive_hook.js` (Shallow Archive Tool)
+### 9. `archive_brain.js` & `archive_hook.js` (Deep & Shallow Archive Tool)
 An intelligent archiving module that manages local disk usage by cleaning up verbose `.system_generated` logs and `scratch` directories within individual `brain` folders. It compresses the cleaned files into `.tar.gz` archives and maintains an `archive_index.json` metadata record. It now runs fully asynchronously as a backend Worker script.
 
 ### 10. `kb_trigger.js` & `antigravity_knowledge_index.js` (Knowledge Base Injector)
