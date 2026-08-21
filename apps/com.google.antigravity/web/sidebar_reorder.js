@@ -73,12 +73,35 @@ export function initSidebarReorder() {
 
         if (!lastVirtualContainer) return;
 
-        // 消除 Conversations Header 的黑色背景
+        // 恢复 Pinned Headers 的样式，不加毛玻璃，并取消吸顶（让它可以滚走）
+        if (pinnedHeaderRow) {
+            pinnedHeaderRow.classList.remove('bg-sidebar');
+            pinnedHeaderRow.style.backgroundColor = 'transparent';
+            // 强制取消吸顶，转为绝对定位随页面滚动
+            pinnedHeaderRow.style.setProperty('position', 'absolute', 'important');
+            
+            const innerBg = pinnedHeaderRow.querySelector('.bg-sidebar');
+            if (innerBg) {
+                innerBg.classList.remove('bg-sidebar');
+                innerBg.style.backgroundColor = 'transparent';
+            }
+        }
+
+        // 处理 Conversations Header：完全透明，且强制取消吸顶（让它可以滚走）
         if (convHeaderRow) {
             convHeaderRow.classList.remove('bg-sidebar');
-            // 内部的 wrapper 也有这个 class
+            convHeaderRow.style.backgroundColor = 'transparent';
+            // 强制取消吸顶，转为绝对定位随页面滚动
+            convHeaderRow.style.setProperty('position', 'absolute', 'important');
+            
             const innerBg = convHeaderRow.querySelector('.bg-sidebar');
-            if (innerBg) innerBg.classList.remove('bg-sidebar');
+            if (innerBg) {
+                innerBg.classList.remove('bg-sidebar');
+                innerBg.style.backgroundColor = 'transparent';
+                innerBg.style.backdropFilter = 'none';
+                innerBg.style.webkitBackdropFilter = 'none';
+                innerBg.style.margin = '0';
+            }
         }
 
         // 注入折叠按钮

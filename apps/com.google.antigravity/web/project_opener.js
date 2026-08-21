@@ -95,7 +95,7 @@ if (!window._ag_global_listener_added_v5) {
             return;
         }
 
-        const btn = e.target.closest('[data-testid^="open-editor"]');
+        const btn = e.target.closest('[data-testid^="open-editor"], [data-testid="install-editor"]');
         if (btn && btn.id !== 'ag-app-selector-btn') {
             if (!btn.hasAttribute('aria-haspopup') && !(btn.getAttribute('data-testid') || '').includes('multi')) {
                 e.preventDefault();
@@ -110,7 +110,7 @@ if (!window._ag_global_listener_added_v5) {
             return;
         }
         
-        if (!e.target.closest('[role="listbox"], [role="menu"]') && !e.target.closest('[data-testid^="open-editor"]')) {
+        if (!e.target.closest('[role="listbox"], [role="menu"]') && !e.target.closest('[data-testid^="open-editor"], [data-testid="install-editor"]')) {
             window._ag_is_waiting_for_multi_project_selection = false;
         }
     }, true); 
@@ -120,6 +120,11 @@ function showAppSelector(anchorElement) {
     if (appSelectorMenu && appSelectorMenu.style.display !== 'none') {
         appSelectorMenu.style.display = 'none';
         return;
+    }
+
+    if (appSelectorMenu) {
+        appSelectorMenu.remove();
+        appSelectorMenu = null;
     }
 
     if (!appSelectorMenu) {
@@ -141,7 +146,11 @@ function showAppSelector(anchorElement) {
         wrapper.className = 'py-1 overflow-auto flex flex-col overscroll-y-none max-h-60';
         appSelectorMenu.appendChild(wrapper);
         
-        CONFIG.apps.forEach(app => {
+        const nativeBtn = captureNativeIdeAnchor();
+        const isInstall = nativeBtn && nativeBtn.getAttribute('data-testid') === 'install-editor';
+        const availableApps = CONFIG.apps.filter(app => !(app.id === 'web' && isInstall));
+        
+        availableApps.forEach(app => {
             const item = document.createElement('button');
             item.className = 'w-full text-left whitespace-nowrap transition-colors duration-150 select-none flex items-center gap-2 px-3 py-2 text-[13px] focus-visible:bg-secondary/50 focus:outline-none no-focus-ring cursor-pointer text-secondary-foreground hover:bg-secondary/50 hover:text-foreground';
             item.setAttribute('role', 'option');
@@ -229,7 +238,7 @@ export function extractActiveUUID() {
 }
 
 function captureNativeIdeAnchor() {
-    const btns = Array.from(document.querySelectorAll('[data-testid^="open-editor"]'));
+    const btns = Array.from(document.querySelectorAll('[data-testid^="open-editor"], [data-testid="install-editor"]'));
     for (let i = btns.length - 1; i >= 0; i--) {
         const btn = btns[i];
         if (btn.getBoundingClientRect().width > 0) return btn;
@@ -247,17 +256,20 @@ function maintainSelectorButton() {
             style.id = 'ag-pure-css-overrides';
             style.textContent = `
                 /* 1. 强制隐藏原生按钮自带的图标 (第一个包含 SVG 的 div) */
-                [data-testid^="open-editor"] > div:first-child {
+                [data-testid^="open-editor"] > div:first-child,
+                [data-testid="install-editor"] > div:first-child {
                     display: none !important;
                 }
                 
                 /* 2. 隐藏多目录模式下的 span 文字 */
-                [data-testid^="open-editor"] > span {
+                [data-testid^="open-editor"] > span,
+                [data-testid="install-editor"] > span {
                     display: none !important;
                 }
                 
                 /* 3. 修改原版按钮 (视觉左侧)：隐藏裸露文字、合体、调整间距 */
-                [data-testid^="open-editor"] {
+                [data-testid^="open-editor"],
+                [data-testid="install-editor"] {
                     font-size: 0 !important;          /* 隐藏单目录下的裸露文字 */
                     border-top-right-radius: 0 !important;
                     border-bottom-right-radius: 0 !important;
@@ -266,7 +278,8 @@ function maintainSelectorButton() {
                 }
                 
                 /* 4. 重新注入 "Open in" 文字 */
-                [data-testid^="open-editor"]::after {
+                [data-testid^="open-editor"]::after,
+                [data-testid="install-editor"]::after {
                     content: "Open in";
                     font-size: 13px !important;
                     visibility: visible !important;
@@ -274,7 +287,8 @@ function maintainSelectorButton() {
                 }
                 
                 /* 5. 确保多目录下的原生下拉箭头排在文字后面 */
-                [data-testid^="open-editor"] > svg {
+                [data-testid^="open-editor"] > svg,
+                [data-testid="install-editor"] > svg {
                     order: 2;
                 }
                 

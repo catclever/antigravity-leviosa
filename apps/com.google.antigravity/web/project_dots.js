@@ -5,8 +5,8 @@ export function initProjectDots() {
     const processedContainers = new WeakSet();
 
     const renderDots = async () => {
-        // 定位侧边栏的副标题
-        const subtitles = document.querySelectorAll('.text-xs.text-muted-foreground.truncate.text-left');
+        // 定位侧边栏的副标题，兼容 ChatGPT 新旧两套 DOM 结构
+        const subtitles = document.querySelectorAll('.text-xs.text-muted-foreground.truncate.text-left, div[data-testid="conversation-row-sidebar"] .text-xs.text-muted-foreground');
         for (let sub of subtitles) {
             if (processedContainers.has(sub)) continue;
 
@@ -17,6 +17,12 @@ export function initProjectDots() {
             const projectPart = text.includes('/') ? text.split('/')[0].trim() : text;
             processedContainers.add(sub);
 
+            // 顺手把官方新增的傻乎乎的 svg 图标隐藏掉
+            const svgIcon = sub.querySelector('svg');
+            if (svgIcon) {
+                svgIcon.style.display = 'none';
+            }
+
             const color = await fetchThemeColor(projectPart);
             if (color) {
                 // 防止因 React 重绘导致重复添加
@@ -26,6 +32,7 @@ export function initProjectDots() {
                 dot.className = 'ag-project-dot';
                 dot.style.cssText = `
                     display: inline-block;
+                    flex-shrink: 0;
                     width: 8px;
                     height: 8px;
                     border-radius: 50%;
