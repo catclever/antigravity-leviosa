@@ -124,7 +124,7 @@ Dynamically changes the topbar's background color based on the project you are c
 
 ### 5. `project_dots.js` (Project Indicators)
 Adds a slick, colored indicator dot next to the project names in the sidebar or subtitles, giving you a quick visual cue of your current project context.
-- **Compatibility:** Fully supports both the classic ChatGPT sidebar and the newly updated flexible DOM structures.
+- **Compatibility:** Fully supports both the classic Antigravity dashboard sidebar and the newly updated flexible DOM structures.
 
 ### 6. `project_search.js` (Project Filter)
 Injects a highly responsive search box directly into the project selection popover dialog. Since the new dashboard groups conversations into a massive list, this makes filtering and finding your specific project a breeze!
