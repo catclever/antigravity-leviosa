@@ -4,7 +4,7 @@
 
 Because the repository's backend logic has been restructured into modular async functions in the `worker` directory, building a mock server is now incredibly simple. You just need an Express server to route requests directly to these worker scripts!
 
-1. Inside the downloaded repository folder (the one containing the `apps` directory), initialize a new project and install dependencies:
+1. Inside the downloaded repository folder (the one cloned to `~/Library/Services/taichi/apps/com.google.antigravity`), initialize a new project and install dependencies:
    ```bash
    npm init -y
    npm install express cors
@@ -19,12 +19,12 @@ Because the repository's backend logic has been restructured into modular async 
    app.use(cors());
 
    // Serve static UI scripts from the web directory
-   app.use('/src/apps/com.google.antigravity/web', express.static(path.join(__dirname, 'apps/com.google.antigravity/web')));
+   app.use('/src/apps/com.google.antigravity/web', express.static(path.join(__dirname, 'web')));
 
    // Route API requests to the worker modules
    app.get('/api/script/apps/com.google.antigravity/worker/:scriptName', async (req, res) => {
        try {
-           const scriptPath = path.join(__dirname, 'apps/com.google.antigravity/worker', req.params.scriptName + '.js');
+           const scriptPath = path.join(__dirname, 'worker', req.params.scriptName + '.js');
            
            // Dynamically require the worker script
            const workerModule = require(scriptPath);

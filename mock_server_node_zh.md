@@ -4,7 +4,7 @@
 
 由于我们最近将后端的逻辑重构为了模块化的异步函数（存放在 `worker` 目录中），现在搭建一个 Mock 服务器变得异常简单。你只需要用 Express 写一个基础的外壳，把请求路由给这些 Worker 脚本去处理即可！
 
-1. 在下载好的仓库目录（也就是包含 `apps` 文件夹的那个目录）下，初始化一个新项目并安装依赖：
+1. 在下载好的仓库目录下（也就是克隆到 `~/Library/Services/taichi/apps/com.google.antigravity` 的那个目录），初始化一个新项目并安装依赖：
    ```bash
    npm init -y
    npm install express cors
@@ -19,12 +19,12 @@
    app.use(cors());
 
    // 静态托管 web 目录下的前端 UI 脚本
-   app.use('/src/apps/com.google.antigravity/web', express.static(path.join(__dirname, 'apps/com.google.antigravity/web')));
+   app.use('/src/apps/com.google.antigravity/web', express.static(path.join(__dirname, 'web')));
 
    // 统一将 API 请求路由给对应的 worker 模块
    app.get('/api/script/apps/com.google.antigravity/worker/:scriptName', async (req, res) => {
        try {
-           const scriptPath = path.join(__dirname, 'apps/com.google.antigravity/worker', req.params.scriptName + '.js');
+           const scriptPath = path.join(__dirname, 'worker', req.params.scriptName + '.js');
            
            // 动态引入 worker 脚本
            const workerModule = require(scriptPath);

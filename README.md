@@ -62,12 +62,13 @@ At its core, this extension works by injecting custom JavaScript and CSS directl
 To get everything up and running, follow these three steps:
 
 ### Step 1: Download the Scripts
-First, you need to get the extension files onto your local machine:
-1. Clone or download this repository to your preferred directory:
+To integrate seamlessly with Taichi, clone this repository directly into Taichi's apps directory as a plugin entity:
+1. Ensure you have the Taichi service installed and running.
+2. Open your terminal and run the following command:
    ```bash
-   git clone https://github.com/catclever/antigravity-leviosa.git
+   git clone https://github.com/catclever/antigravity-leviosa.git ~/Library/Services/taichi/apps/com.google.antigravity
    ```
-2. Note the absolute path to this directory, as you'll need it for the configuration step.
+3. You're good to go! Once Taichi is running locally, it automatically discovers the plugin.
 
 ### Step 2: Setup the Local Data Source
 To unlock the full potential of this extension, you'll need a local API endpoint running in the background. You have two ways to set this up:
@@ -76,7 +77,7 @@ To unlock the full potential of this extension, you'll need a local API endpoint
 This extension is designed to work seamlessly with my local **Taichi** service (currently Mac Only), which acts as the primary data source for these dynamic configurations. 
 
 1. Clone and start the Taichi service: [https://github.com/catclever/taichi](https://github.com/catclever/taichi)
-2. Simply copy the `apps` folder from the downloaded repository into your Taichi's local scripts directory. (This will merge the `com.google.antigravity` app into your Taichi environment).
+2. Since you've already cloned the repository directly into Taichi's `apps` directory in Step 1, no further file copying is needed.
 3. Once Taichi is running locally, it automatically hosts these files and exposes the required endpoint at `http://127.0.0.1:9216`.
 4. You're good to go!
 
@@ -91,7 +92,7 @@ Whichever method you choose, ensure the service is running before proceeding to 
 ### Step 3: Configure Antigravity
 Finally, you need to tell the Antigravity dashboard to load these custom scripts.
 
-1. In the Antigravity dashboard, open the Developer Tools by pressing `Command + Option + I` (on Mac). *(Note: Following the June 12, 2026 Google update, this shortcut is now disabled. You will need to access it via web-based debugging mode instead. Please search for instructions on how to enable this.)*
+1. ~In the Antigravity dashboard, open the Developer Tools by pressing `Command + Option + I` (on Mac).~ *(Note: Following the June 12, 2026 Google update, this shortcut is now disabled. You will need to access it via web-based debugging mode instead. Please search for instructions on how to enable this.)*
 2. Navigate to the **Sources** tab.
 3. In the left panel (you might need to click the `>>` icon), select **Snippets** and create a new snippet.
 4. Enter the following code into the snippet editor:
