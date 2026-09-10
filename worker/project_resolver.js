@@ -121,11 +121,13 @@ function findProjectDir(projectName) {
             }
         }
         
-        const fallbackRepoPath = findProjectDirFast(PROJECT_ROOTS, repoName);
-        if (fallbackRepoPath) {
-            const fullPath = path.join(fallbackRepoPath, subDir);
-            if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
-                candidates.add(fullPath);
+        if (candidates.size === 0) {
+            const fallbackRepoPath = findProjectDirFast(PROJECT_ROOTS, repoName);
+            if (fallbackRepoPath) {
+                const fullPath = path.join(fallbackRepoPath, subDir);
+                if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
+                    candidates.add(fullPath);
+                }
             }
         }
     }
@@ -140,9 +142,11 @@ function findProjectDir(projectName) {
         }
     }
     
-    const fallbackPath = findProjectDirFast(PROJECT_ROOTS, subDir);
-    if (fallbackPath) {
-        candidates.add(fallbackPath);
+    if (candidates.size === 0) {
+        const fallbackPath = findProjectDirFast(PROJECT_ROOTS, subDir);
+        if (fallbackPath) {
+            candidates.add(fallbackPath);
+        }
     }
 
     if (candidates.size === 0) return null;

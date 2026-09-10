@@ -97,7 +97,11 @@ if (!window._ag_global_listener_added_v5) {
 
         const btn = e.target.closest('[data-testid^="open-editor"], [data-testid="install-editor"]');
         if (btn && btn.id !== 'ag-app-selector-btn') {
-            if (!btn.hasAttribute('aria-haspopup') && !(btn.getAttribute('data-testid') || '').includes('multi')) {
+            const isMulti = btn.hasAttribute('aria-haspopup') || 
+                            btn.hasAttribute('aria-expanded') || 
+                            (btn.getAttribute('data-testid') || '').includes('multi');
+                            
+            if (!isMulti) {
                 e.preventDefault();
                 e.stopPropagation();
                 const proj = extractActiveProjectName() || currentProject;
@@ -166,6 +170,12 @@ function showAppSelector(anchorElement) {
                 appSelectorMenu.style.display = 'none';
                 selectedApp = app;
                 updateSelectorButton();
+                
+                // 选中后自动触发一次原生的 Open In 按钮
+                const nativeBtn = captureNativeIdeAnchor();
+                if (nativeBtn) {
+                    nativeBtn.click();
+                }
             };
             wrapper.appendChild(item);
         });
@@ -190,6 +200,20 @@ function updateSelectorButton() {
 }
 
 export function extractActiveProjectName() {
+    // 0. 尝试新版 UI 提取
+    const trigger = document.querySelector('[data-testid="project-selector-trigger"]');
+    if (trigger) {
+        const ariaLabel = trigger.getAttribute('aria-label') || '';
+        const match = ariaLabel.match(/current:\s*(.+)$/);
+        if (match && match[1]) {
+            return match[1].trim();
+        }
+        const span = trigger.querySelector('span.truncate');
+        if (span && span.textContent.trim()) {
+            return span.textContent.trim();
+        }
+    }
+
     const spans = Array.from(document.querySelectorAll('span.truncate.inline-block'));
     
     // 1. 优先尝试多目录模式：寻找后面跟着 '/' 的 span
@@ -223,7 +247,7 @@ export function extractActiveProjectName() {
 
 export function extractActiveUUID() {
     // 1. Try URL first
-    const match = window.location.pathname.match(new RegExp('/c/([a-f0-9\\\\-]{36})', 'i'));
+    const match = window.location.pathname.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
     if (match) return match[1];
 
     // 2. Try DOM fallback
