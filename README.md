@@ -120,10 +120,10 @@ This is the conductor that imports and initializes all other modules.
 ### 2. `api.js` (The Data Bridge)
 Handles all communication between the dashboard and your local data source (Taichi or Mock Server). Rather than just fetching colors, it acts as a universal bridge calling various modular scripts located in the `worker/` directory (e.g., triggering IDE openings, fetching knowledge indexes, and retrieving theme colors).
 - **Caching:** For expensive operations like theme lookups, it features a built-in L2 memory cache with a Time-To-Live (TTL) of **1 hour** to keep the UI snappy.
-- **Robust Path Resolution:** When worker scripts (like theme syncing) need to find your actual local project folders, they rely on a powerful `project_resolver.js` utility in the backend:
-  1. **Multi-Root Workspace Parsing:** It splits comma-separated project names and scans each sub-project sequentially.
-  2. **SQLite Exact Matching:** It directly queries the IDE's local SQLite database (`state.vscdb`) to fetch the absolute paths of your recently opened workspaces. This ensures `O(1)` precision without requiring any manual path configuration!
-  3. **Fuzzy Fallback:** If the exact path isn't found in the database, it falls back to a fuzzy search across common fallback directories.
+- **Robust Path Resolution:** When worker scripts (like theme syncing or project opening) need to find your actual local project folders, they rely on a powerful `project_resolver.js` utility in the backend:
+  1. **Native Antigravity Database Parsing:** It parses your local `~/.gemini/config/projects/*.json` project files and `agyhub_summaries_proto.pb` database to precisely locate the absolute paths for multi-root workspaces and sub-directories. This means it inherits the exact project structure defined in Antigravity natively.
+  2. **SQLite Exact Matching:** It can also query the local SQLite database (`state.vscdb`) to fetch the absolute paths of your recently opened workspaces.
+  3. **Fuzzy Fallback:** If the exact path isn't found, it falls back to a recursive fuzzy search across common fallback directories.
 
 ### 3. `background.js` (Workspace Background)
 Injects a custom background image into the dashboard along with some base CSS tweaks to make the UI look gorgeous.
@@ -142,8 +142,10 @@ Injects a highly responsive search box directly into the project selection popov
 ### 7. `double_click_submit.js` (Fast Submit & UI Polish)
 Adds a slick golden border and glow to the currently selected radio button options in dialogs, making it much clearer what you have selected. More importantly, it introduces a "click-again to submit" behavior: if you click an already-selected radio option, it will automatically find and trigger the "Submit" button for you. This dramatically speeds up interactions when dealing with multiple-choice workflows!
 
-### 8. `project_opener.js` & `antigravity_open_project.js` (One-Click IDE Opener)
-Overrides the native "Open Editor" or "Install IDE" button by injecting a customizable dropdown menu, allowing you to open the active project directly into your preferred tools (VS Code, Kitty, Finder, etc.). It supports both single directories and multi-root workspaces. It intelligently hides the Antigravity web IDE option from the menu if you haven't installed it.
+### 8. `project_opener.js`, `antigravity_open_project.js` & `antigravity_list_project_dirs.js` (One-Click IDE Opener)
+Overrides the native "Open Editor" or "Install IDE" button by injecting a customizable dropdown menu, allowing you to open the active project directly into your preferred tools (VS Code, Kitty, Finder, etc.). 
+- **Native Multi-Directory Support:** For projects with multiple configured workspaces, it queries the local Antigravity database via `antigravity_list_project_dirs.js` and automatically pops up a custom sub-directory selection dropdown, bypassing Leviosa's native UI limitations completely!
+- It also intelligently hides the Antigravity web IDE option from the menu if you haven't installed it.
 - **Customization:** You can modify the `CONFIG.apps` array at the top of `project_opener.js` to add custom IDEs, change the default application, or update the SVG icons.
 - **Backend Requirement:** This feature relies on the local service (Taichi or Mock Server) to execute the actual shell commands. It expects the endpoint `/api/script/apps/com.google.antigravity/worker/antigravity_open_project` to be available. If using a DIY mock server, you must implement this endpoint to handle the `open` commands.
 
