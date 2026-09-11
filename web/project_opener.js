@@ -78,7 +78,7 @@ if (!window._ag_global_listener_added_v5) {
             const originalHtml = btn.innerHTML;
             btn.style.opacity = '0.5';
             
-            fetch(`http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_list_project_dirs.js?uuid=${uuid || ''}&project=${encodeURIComponent(proj || '')}`)
+            fetch(`http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_list_project_dirs?uuid=${uuid || ''}&project=${encodeURIComponent(proj || '')}`)
                 .then(res => res.json())
                 .then(data => {
                     btn.style.opacity = '1';
