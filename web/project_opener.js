@@ -66,58 +66,91 @@ if (!window._ag_global_listener_added_v5) {
 
         if (selectedApp.isWeb) return;
 
-        const popup = e.target.closest('[role="listbox"], [role="menu"]');
-        if (popup && !popup.classList.contains('ag-dropdown-menu')) {
-            const option = e.target.closest('[role="option"], [role="menuitem"]');
-            if (option) {
-                if (window._ag_is_waiting_for_multi_project_selection) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    let projectName = '';
-                    const span = option.querySelector('span.truncate');
-                    if (span) {
-                        projectName = span.textContent.trim();
-                    } else {
-                        const spans = Array.from(option.querySelectorAll('span')).filter(s => s.textContent.trim() && !s.querySelector('svg'));
-                        projectName = spans.length > 0 ? spans[spans.length - 1].textContent.trim() : option.textContent.trim();
-                    }
-                    
-                    if (projectName) {
-                        const repoName = extractActiveProjectName() || currentProject;
-                        const queryProj = (repoName && repoName !== projectName) ? `${repoName}/${projectName}` : projectName;
-                        const uuid = extractActiveUUID();
-                        openProjectBackend(queryProj, selectedApp.appName, !!selectedApp.supportsWorkspace, uuid);
-                    }
-                    setTimeout(() => { document.body.click(); }, 10);
-                }
-            }
-            return;
-        }
-
         const btn = e.target.closest('[data-testid^="open-editor"], [data-testid="install-editor"]');
         if (btn && btn.id !== 'ag-app-selector-btn') {
-            const isMulti = btn.hasAttribute('aria-haspopup') || 
-                            btn.hasAttribute('aria-expanded') || 
-                            (btn.getAttribute('data-testid') || '').includes('multi');
-                            
-            if (!isMulti) {
-                e.preventDefault();
-                e.stopPropagation();
-                const proj = extractActiveProjectName() || currentProject;
-                const uuid = extractActiveUUID();
-                openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace, uuid);
-                window._ag_is_waiting_for_multi_project_selection = false;
-            } else {
-                window._ag_is_waiting_for_multi_project_selection = true;
-            }
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const uuid = extractActiveUUID();
+            const proj = extractActiveProjectName() || currentProject;
+            
+            // Add a simple loading state to the button
+            const originalHtml = btn.innerHTML;
+            btn.style.opacity = '0.5';
+            
+            fetch(`http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_list_project_dirs.js?uuid=${uuid || ''}`)
+                .then(res => res.json())
+                .then(data => {
+                    btn.style.opacity = '1';
+                    if (data.success && data.paths && data.paths.length > 1) {
+                        showSubProjectSelector(btn, proj, data.paths, uuid);
+                    } else {
+                        openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace, uuid);
+                    }
+                })
+                .catch(err => {
+                    btn.style.opacity = '1';
+                    openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace, uuid);
+                });
             return;
         }
-        
-        if (!e.target.closest('[role="listbox"], [role="menu"]') && !e.target.closest('[data-testid^="open-editor"], [data-testid="install-editor"]')) {
-            window._ag_is_waiting_for_multi_project_selection = false;
-        }
     }, true); 
+}
+
+let subProjSelectorMenu = null;
+function showSubProjectSelector(anchorElement, repoName, paths, uuid) {
+    if (subProjSelectorMenu) {
+        subProjSelectorMenu.remove();
+    }
+    
+    subProjSelectorMenu = document.createElement('div');
+    subProjSelectorMenu.className = 'ag-dropdown-menu border rounded-lg bg-card text-foreground shadow-lg animate-slideIn origin-top min-w-[150px]';
+    subProjSelectorMenu.setAttribute('role', 'listbox');
+    
+    const wrapper = document.createElement('div');
+    wrapper.className = 'py-1 overflow-auto flex flex-col overscroll-y-none max-h-60';
+    subProjSelectorMenu.appendChild(wrapper);
+    
+    paths.forEach(p => {
+        const basename = p.split('/').pop();
+        const item = document.createElement('button');
+        item.className = 'w-full text-left whitespace-nowrap transition-colors duration-150 select-none flex items-center gap-2 px-3 py-2 text-[13px] focus-visible:bg-secondary/50 focus:outline-none no-focus-ring cursor-pointer text-secondary-foreground hover:bg-secondary/50 hover:text-foreground';
+        item.setAttribute('role', 'option');
+        
+        // Add a generic folder icon
+        const folderIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-70"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-1.22-1.8A2 2 0 0 0 8.4 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path></svg>`;
+        item.innerHTML = `<div class="flex items-center gap-2 w-full"><div class="flex-shrink-0 flex items-center justify-center">${folderIcon}</div><span class="truncate">${basename}</span></div>`;
+        
+        item.onclick = (ev) => {
+            ev.stopPropagation();
+            subProjSelectorMenu.style.display = 'none';
+            const queryProj = (repoName && repoName !== basename) ? `${repoName}/${basename}` : basename;
+            openProjectBackend(queryProj, selectedApp.appName, !!selectedApp.supportsWorkspace, uuid);
+        };
+        wrapper.appendChild(item);
+    });
+    
+    document.body.appendChild(subProjSelectorMenu);
+    
+    const rect = anchorElement.getBoundingClientRect();
+    subProjSelectorMenu.style.cssText = `
+        position: fixed;
+        top: ${rect.bottom + 8}px;
+        right: ${window.innerWidth - rect.right}px;
+        z-index: 3000;
+        display: block;
+    `;
+    
+    const closeListener = (e) => {
+        if (!e.target.closest('.ag-dropdown-menu')) {
+            if (subProjSelectorMenu) subProjSelectorMenu.style.display = 'none';
+            document.removeEventListener('click', closeListener, true);
+        }
+    };
+    // Use a small timeout so the current click doesn't immediately close it
+    setTimeout(() => {
+        document.addEventListener('click', closeListener, true);
+    }, 10);
 }
 
 function showAppSelector(anchorElement) {
