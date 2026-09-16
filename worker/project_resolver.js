@@ -96,8 +96,8 @@ function findProjectDir(projectName) {
 
     if (projectName.includes('/')) {
         const parts = projectName.split('/');
-        repoName = parts[0];
-        subDir = parts.slice(1).join('/');
+        repoName = parts[0].trim();
+        subDir = parts.slice(1).join('/').trim();
     }
     
     const knownPaths = getAllKnownWorkspaces();

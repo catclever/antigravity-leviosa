@@ -1,37 +1,10 @@
 // topbar_color.js
 import { fetchThemeColor, getLuminance } from './api.js';
+import { extractActiveProjectName } from './project_opener.js';
 
 const TOPBAR_BG_VAR = "--topbar-bg-color";
 const TOPBAR_TEXT_VAR = "--topbar-text-color";
 let currentProject = "";
-
-/*
- * [Bug Fix Document]
- * 1. Problem: When the main titlebar is empty, the project name is missing, leading to the color not being fetched or updated.
- * 2. Method: Added a fallback selector `span.truncate.flex-1.min-w-0` to extract the project name from the sidebar if it's missing from the main titlebar.
- * 3. Caveat: If the sidebar UI structure changes, this fallback will fail. We rely on the specific class structure of the sidebar item.
- */
-function extractActiveProjectName() {
-    // 1. 优先尝试从顶部标题栏提取
-    const spans = document.querySelectorAll('span.truncate.inline-block');
-    for (let span of spans) {
-        const parent = span.parentElement;
-        if (parent) {
-            const nextSibling = parent.nextElementSibling;
-            if (nextSibling && nextSibling.textContent.trim() === '/') {
-                return span.textContent.trim();
-            }
-        }
-    }
-
-    // 2. 备选：从侧边栏等位置提取（应对标题栏为空时）
-    const fallbackSpan = document.querySelector('span.truncate.flex-1.min-w-0');
-    if (fallbackSpan) {
-        return fallbackSpan.textContent.trim();
-    }
-
-    return null;
-}
 
 async function syncTopbarTheme(projectName) {
     const color = await fetchThemeColor(projectName);

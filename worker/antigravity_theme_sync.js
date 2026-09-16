@@ -14,7 +14,7 @@ function findProjectSettings(projectName) {
     
     // 2. 如果包含 repoName（例如 "antigravity-leviosa/com.google.antigravity"）
     if (projectName.includes('/')) {
-        const repoName = projectName.split('/')[0];
+        const repoName = projectName.split('/')[0].trim();
         const repoDir = findProjectDir(repoName);
         if (repoDir) {
             const settingsPath = path.join(repoDir, '.vscode', 'settings.json');
