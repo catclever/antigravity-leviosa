@@ -81,6 +81,26 @@ export function initBackground() {
                 box-shadow: none !important;
             }
 
+            /* === 4.1 浮动面板与内部面板豁免 (Panels Exemption) === */
+            /* 保证悬浮的评论框、Tooltip、以及对话框内部的特殊卡片（如规则块）不会被完全透明化 */
+            .bg-background div[data-testid="comment-box"],
+            .bg-muted div[data-testid="comment-box"],
+            [data-testid="conversation-view"] div[data-testid="comment-box"],
+            .bg-background .absolute.z-50.bg-muted,
+            .bg-background .absolute.z-50.bg-background,
+            .bg-muted .absolute.z-50.bg-muted,
+            .bg-muted .absolute.z-50.bg-background,
+            [data-radix-popper-content-wrapper] .bg-muted,
+            [data-radix-popper-content-wrapper] .bg-background,
+            [data-testid="conversation-view"] div.border.bg-muted,
+            [data-testid="conversation-view"] div.rounded-xl.bg-muted,
+            [data-testid="conversation-view"] div.rounded-lg.bg-muted,
+            [data-testid="conversation-view"] div.rounded-md.bg-muted {
+                background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 90%, transparent) !important;
+                backdrop-filter: blur(16px) !important;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+            }
+
             div[aria-label="User message"]::after,
             .after\\:from-background::after {
                 display: none !important;
