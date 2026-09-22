@@ -3,7 +3,7 @@ import { extractActiveProjectName } from './project_opener.js';
 import { fetchKnowledgeIndex } from './api.js';
 
 export function initKbTrigger() {
-    console.log('📚 [Antigravity Mod] 初始化 #kb 知识注入触发器 (支持 Global/Local 双库)');
+    console.log('📚 [Antigravity Mod] 初始化 #cmd 知识注入触发器 (支持 Global/Local 双库)');
 
     let dropdownContainer = null;
     let rulesData = [];
@@ -201,9 +201,9 @@ export function initKbTrigger() {
         let cleanText = rawText.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\u00A0/g, ' ');
 
         let matchScope = null;
-        if (cleanText.endsWith('#kb ')) { matchScope = 'all'; currentMatchLength = 4; }
-        else if (cleanText.endsWith('#kbg ')) { matchScope = 'global'; currentMatchLength = 5; }
-        else if (cleanText.endsWith('#kbl ')) { matchScope = 'local'; currentMatchLength = 5; }
+        if (cleanText.endsWith('#cmd ')) { matchScope = 'all'; currentMatchLength = 5; }
+        else if (cleanText.endsWith('#cmdg ')) { matchScope = 'global'; currentMatchLength = 6; }
+        else if (cleanText.endsWith('#cmdl ')) { matchScope = 'local'; currentMatchLength = 6; }
 
         if (matchScope) {
             const projName = extractActiveProjectName();
@@ -218,7 +218,7 @@ export function initKbTrigger() {
             } else {
                 console.warn('[kb_trigger] 无法解析当前项目名称且当前作用域为 Local，无法获取本地知识库');
             }
-        } else if (isMenuVisible && !cleanText.includes('#kb')) {
+        } else if (isMenuVisible && !cleanText.includes('#cmd')) {
             hideMenu();
         }
     });

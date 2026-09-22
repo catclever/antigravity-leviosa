@@ -57,6 +57,16 @@ export function initBackground() {
                 box-shadow: inset 1px 0 0 0 rgba(255, 255, 255, 0.05) !important;
             }
 
+            /* 特殊处理：移除设置面板左侧导航项及其包装器被误伤注入的挤压背景图 */
+            #root div:has(> button[data-testid^="settings-nav-item-"]),
+            #root div:has(> button[data-testid^="settings-nav-item-"]) *,
+            #root button[data-testid^="settings-nav-item-"],
+            #root [class*="border-sidebar-border"]:not(aside):not(sidebar) {
+                background-image: none !important;
+                backdrop-filter: none !important;
+                background-color: transparent !important;
+            }
+
             /* === 3. 基础毛玻璃层 (完美继承 V4.2 右侧的神仙质感) === */
             .bg-background, .bg-muted,
             [data-testid="conversation-view"] {
@@ -99,6 +109,24 @@ export function initBackground() {
                 background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 90%, transparent) !important;
                 backdrop-filter: blur(16px) !important;
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+            }
+
+            /* === 4.2 模态框/弹窗专属豁免 (Dialog & Popups) === */
+            /* 保证各种弹出模态框（如二维码分享、Remote Control）有足够的质感与阅读体验 */
+            .bg-background[role="dialog"],
+            .bg-muted[role="dialog"],
+            .bg-card[role="dialog"],
+            [role="dialog"] .bg-background,
+            [role="dialog"] .bg-muted,
+            .bg-background:has(svg[aria-label="Remote Control link"]),
+            .bg-muted:has(svg[aria-label="Remote Control link"]),
+            .bg-card:has(svg[aria-label="Remote Control link"]),
+            div:has(> .relative > div > svg[aria-label="Remote Control link"]),
+            .relative:has(> div > svg[aria-label="Remote Control link"]) {
+                background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 70%, transparent) !important;
+                backdrop-filter: blur(40px) saturate(150%) !important;
+                border: 1px solid rgba(255, 255, 255, 0.15) !important;
+                box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3) !important;
             }
 
             div[aria-label="User message"]::after,
