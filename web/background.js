@@ -126,7 +126,7 @@ export function initBackground() {
             .bg-card:has(svg[aria-label="Remote Control link"]),
             div:has(> .relative > div > svg[aria-label="Remote Control link"]),
             .relative:has(> div > svg[aria-label="Remote Control link"]) {
-                background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 70%, transparent) !important;
+                background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 85%, transparent) !important;
                 backdrop-filter: blur(40px) saturate(150%) !important;
                 border: 1px solid rgba(255, 255, 255, 0.15) !important;
                 box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3) !important;
