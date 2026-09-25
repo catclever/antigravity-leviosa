@@ -112,10 +112,13 @@ export function initBackground() {
             }
 
             /* === 4.2 模态框/弹窗专属豁免 (Dialog & Popups) === */
-            /* 保证各种弹出模态框（如二维码分享、Remote Control）有足够的质感与阅读体验 */
+            /* 保证各种弹出模态框（如二维码分享、Remote Control）和下拉菜单（如配额模型选择）有足够的质感与阅读体验 */
             .bg-background[role="dialog"],
             .bg-muted[role="dialog"],
             .bg-card[role="dialog"],
+            .bg-background[role="menu"],
+            .bg-muted[role="menu"],
+            .bg-card[role="menu"],
             [role="dialog"] .bg-background,
             [role="dialog"] .bg-muted,
             .bg-background:has(svg[aria-label="Remote Control link"]),
@@ -132,6 +135,20 @@ export function initBackground() {
             div[aria-label="User message"]::after,
             .after\\:from-background::after {
                 display: none !important;
+            }
+
+            /* 强行移除对话行容器的自带背景色，防止出现黑色横条 (最高权重) */
+            #root [data-testid="conversation-view"] > div,
+            #root [data-testid="conversation-view"] > div > div,
+            #root [data-testid="conversation-view"] > div > div > div,
+            #root [data-testid="conversation-view"] > div > div > div > div:not([data-testid="lifted-context-menu-trigger"]):not(.bg-card):not(.bg-secondary),
+            .md-sticky-message-bleed::before,
+            .md-sticky-message-bleed::after {
+                background: transparent !important;
+                background-color: transparent !important;
+                background-image: none !important;
+                box-shadow: none !important;
+                backdrop-filter: none !important;
             }
 
             /* === 5. 消息气泡 & 交互小卡片浮雕化 === */
