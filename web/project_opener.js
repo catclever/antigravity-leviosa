@@ -299,9 +299,9 @@ export function extractActiveProjectName() {
     }
     
     if (result) {
-        // 过滤掉已知的非项目名称的 UI 文案，包括模型名称
+        // 过滤掉已知的非项目名称的 UI 文案，精准匹配模型名称，避免误杀名为 "gemini" 的真实项目
         const ignoreList = ['New Chat', '新对话', 'New conversation', 'Untitled', 'Antigravity'];
-        const isModelName = result.startsWith('Gemini') || result.startsWith('Gemma') || result.includes('Pro') || result.includes('Flash');
+        const isModelName = /^Gemini\s+\d+\.\d+/.test(result) || result.includes('Pro (') || result.includes('Flash (') || result === 'Gemini Advanced';
         
         if (ignoreList.includes(result) || isModelName) {
             return null;
