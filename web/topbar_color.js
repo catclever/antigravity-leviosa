@@ -27,11 +27,14 @@ export function initTopbar() {
          * 1. Problem: The previous CSS selectors targeting the topbar were extremely fragile (e.g., #root > div...) and broke when the DOM structure updated. Furthermore, relying purely on buttons failed when the titlebar was empty.
          * 2. Method: Replaced fragile DOM paths with robust characteristic-based selectors using :has() and [style*="app-region: drag"] to capture the structural layout directly.
          * 3. Caveat: If the application removes or alters these specific attributes (data-testid, app-region), the topbar will lose its customized background color again.
-         */
+         * 4. SPA Bug: React route changes (like navigating to "New Chat") can wipe `document.documentElement.style`, losing CSS variables. We now use MutationObserver to detect variable loss and restore them, while gracefully handling "New Chat" empty DOM states by falling back to `currentProject` and adding `open-editor` buttons to the CSS selector.
         /* 智能追踪特征选择器（兼容旧版备选） */
         div.shrink-0[style*="app-region: drag"],
         div.select-none.justify-between[style*="app-region: drag"],
         div.select-none.justify-between:has(button[data-testid="titlebar-more-actions"]),
+        div.select-none.justify-between:has(span[data-testid="breadcrumb-segment"]),
+        div.select-none.justify-between:has([data-testid^="open-editor"]),
+        div.select-none.justify-between:has([data-testid="install-editor"]),
         div.border-b:has(button[data-tab-id="overview"]),
         header, [data-test-id="chat-header"], .top-bar-class,
         div:has(> button[data-testid="close-aux-pane"]) {
@@ -43,9 +46,19 @@ export function initTopbar() {
     document.head.appendChild(style);
 
     const observer = new MutationObserver(() => {
-        const foundProject = extractActiveProjectName();
-        if (foundProject && foundProject !== currentProject) {
-            console.log(`[Antigravity] 识别到当前项目: ${foundProject}`);
+        // 如果提取不到项目名，回退使用已知的 currentProject，防止在新对话页面 UI 隐藏项目名时彻底失效
+        const foundProject = extractActiveProjectName() || currentProject;
+        
+        // 检查 CSS 变量是否被 SPA 路由重置了（React 等框架在路由切换时可能会清空 html 的 inline style）
+        const isVarMissing = foundProject && !document.documentElement.style.getPropertyValue(TOPBAR_BG_VAR);
+        
+        if (foundProject && (foundProject !== currentProject || isVarMissing)) {
+            // 如果发现了新的项目，或者变量丢失了，则进行同步
+            if (foundProject !== currentProject) {
+                console.log(`[Antigravity] 识别到当前项目变化: ${foundProject}`);
+            } else {
+                console.log(`[Antigravity] SPA 路由切换导致主题变量丢失，尝试重新注入...`);
+            }
             currentProject = foundProject;
             syncTopbarTheme(currentProject);
         }

@@ -247,10 +247,21 @@ export function extractActiveProjectName() {
         }
     }
 
+    // 1. 优先尝试从面包屑 (breadcrumb) 中提取，第一个面包屑通常就是项目根目录
+    const breadcrumbSegments = Array.from(document.querySelectorAll('span[data-testid="breadcrumb-segment"] .truncate'));
+    if (breadcrumbSegments.length > 0) {
+        for (const segment of breadcrumbSegments) {
+            const rect = segment.getBoundingClientRect();
+            if (rect.width > 0) {
+                return segment.textContent.trim();
+            }
+        }
+    }
+
     const spans = Array.from(document.querySelectorAll('span.truncate.inline-block'));
     
-    // 1. 优先尝试多目录模式：寻找后面跟着 '/' 的 span
-    for (let i = spans.length - 1; i >= 0; i--) {
+    // 2. 兼容旧版多目录模式：寻找后面跟着 '/' 的 span，正向遍历找到第一个
+    for (let i = 0; i < spans.length; i++) {
         const span = spans[i];
         const rect = span.getBoundingClientRect();
         if (rect.width === 0) continue; 
@@ -264,18 +275,28 @@ export function extractActiveProjectName() {
         }
     }
     
-    // 2. 降级：单目录模式。直接取最后一个可见的 truncate span
+    // 3. 降级：单目录模式。直接取最后一个可见的 truncate span
+    let result = null;
     for (let i = spans.length - 1; i >= 0; i--) {
         const span = spans[i];
         const rect = span.getBoundingClientRect();
         if (rect.width === 0) continue; 
         const text = span.textContent.trim();
         if (text && text !== '/') {
-            return text;
+            result = text;
+            break;
         }
     }
     
-    return null;
+    if (result) {
+        // 过滤掉已知的非项目名称的 UI 文案
+        const ignoreList = ['New Chat', '新对话', 'New conversation', 'Untitled', 'Antigravity'];
+        if (ignoreList.includes(result)) {
+            return null;
+        }
+    }
+    
+    return result;
 }
 
 export function extractActiveUUID() {
