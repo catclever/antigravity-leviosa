@@ -33,8 +33,8 @@ export function initTopbar() {
         div.select-none.justify-between[style*="app-region: drag"],
         div.select-none.justify-between:has(button[data-testid="titlebar-more-actions"]),
         div.select-none.justify-between:has(span[data-testid="breadcrumb-segment"]),
-        div.select-none.justify-between:has([data-testid^="open-editor"]),
-        div.select-none.justify-between:has([data-testid="install-editor"]),
+        div.flex.justify-between:has([data-testid^="open-editor"]),
+        div.flex.justify-between:has([data-testid="install-editor"]),
         div.border-b:has(button[data-tab-id="overview"]),
         header, [data-test-id="chat-header"], .top-bar-class,
         div:has(> button[data-testid="close-aux-pane"]) {

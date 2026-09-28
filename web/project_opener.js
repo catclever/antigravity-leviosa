@@ -258,7 +258,17 @@ export function extractActiveProjectName() {
         }
     }
 
-    const spans = Array.from(document.querySelectorAll('span.truncate.inline-block'));
+    // 2. 限定搜索范围在顶栏内，防止误抓取页面主体中的内容（如模型名称）
+    let searchRoot = document;
+    const topbarAnchor = document.querySelector('[data-testid="titlebar-more-actions"], [data-testid^="open-editor"], [data-testid="install-editor"]');
+    if (topbarAnchor) {
+        const topbar = topbarAnchor.closest('.justify-between');
+        if (topbar) {
+            searchRoot = topbar;
+        }
+    }
+
+    const spans = Array.from(searchRoot.querySelectorAll('span.truncate.inline-block'));
     
     // 2. 兼容旧版多目录模式：寻找后面跟着 '/' 的 span，正向遍历找到第一个
     for (let i = 0; i < spans.length; i++) {
@@ -289,9 +299,11 @@ export function extractActiveProjectName() {
     }
     
     if (result) {
-        // 过滤掉已知的非项目名称的 UI 文案
+        // 过滤掉已知的非项目名称的 UI 文案，包括模型名称
         const ignoreList = ['New Chat', '新对话', 'New conversation', 'Untitled', 'Antigravity'];
-        if (ignoreList.includes(result)) {
+        const isModelName = result.startsWith('Gemini') || result.startsWith('Gemma') || result.includes('Pro') || result.includes('Flash');
+        
+        if (ignoreList.includes(result) || isModelName) {
             return null;
         }
     }
