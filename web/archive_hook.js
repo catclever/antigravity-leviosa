@@ -130,9 +130,10 @@ export function initArchiveHook() {
             return;
         }
 
-        // 通过判断按钮内的 SVG path 来精准定位是否为“归档”按钮
-        // 归档图标（向下的箭头）包含 M480-256.16L626.15，去除了共通的盒子部分，防止和 Restore 按钮冲突！
-        const isArchiveButton = btn.innerHTML.includes('M480-256.16L626.15');
+        // 使用更加鲁棒的原生属性（data-testid 或 aria-label）来定位浅层归档按钮
+        // 彻底抛弃对脆弱的 SVG 路径的依赖
+        const isArchiveButton = btn.getAttribute('data-testid') === 'conversation-archive-button' || 
+                                (btn.getAttribute('aria-label') && btn.getAttribute('aria-label').includes('Archive'));
 
         if (HOOK_CONFIG.enableShallowArchive && isArchiveButton) {
             const { uuid, title, project } = extractMetadataFromElement(target);
