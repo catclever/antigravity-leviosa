@@ -45,7 +45,7 @@ export function initTopbar() {
     `;
     document.head.appendChild(style);
 
-    const observer = new MutationObserver(() => {
+    const checkAndSync = () => {
         // 如果提取不到项目名，回退使用已知的 currentProject，防止在新对话页面 UI 隐藏项目名时彻底失效
         const foundProject = extractActiveProjectName() || currentProject;
         
@@ -62,9 +62,13 @@ export function initTopbar() {
             currentProject = foundProject;
             syncTopbarTheme(currentProject);
         }
-    });
+    };
 
+    const observer = new MutationObserver(checkAndSync);
     observer.observe(document.body, { childList: true, subtree: true });
+    
+    // 安全网：定期检查，防止 React 无缝路由（完全没有触发 body mutation，或在 mutation 后异步刷掉 style）
+    setInterval(checkAndSync, 800);
 
     setTimeout(() => {
         const p = extractActiveProjectName();

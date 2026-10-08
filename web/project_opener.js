@@ -251,9 +251,9 @@ export function extractActiveProjectName() {
     const breadcrumbSegments = Array.from(document.querySelectorAll('span[data-testid="breadcrumb-segment"] .truncate'));
     if (breadcrumbSegments.length > 0) {
         for (const segment of breadcrumbSegments) {
-            const rect = segment.getBoundingClientRect();
-            if (rect.width > 0) {
-                return segment.textContent.trim();
+            const text = segment.textContent.trim();
+            if (text) {
+                return text;
             }
         }
     }
