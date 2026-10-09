@@ -262,39 +262,72 @@ export function extractActiveProjectName() {
         }
     }
 
-    // 1. 优先尝试从面包屑 (breadcrumb) 中提取，将所有层级组合成多目录请求
+    // 1. 优先尝试从面包屑 (breadcrumb) 中提取，第一个面包屑通常就是项目根目录
     const breadcrumbSegments = Array.from(document.querySelectorAll('span[data-testid="breadcrumb-segment"] .truncate'));
     if (breadcrumbSegments.length > 0) {
-        const texts = breadcrumbSegments.map(s => s.textContent.trim()).filter(Boolean);
-        if (texts.length > 0) {
-            return texts.join(',');
+        for (const segment of breadcrumbSegments) {
+            const text = segment.textContent.trim();
+            if (text) {
+                return text;
+            }
         }
     }
 
+    /*
+     * [Bug Fix Document]
+     * 1. Problem: First time entering "New Chat" page (no breadcrumbs), the topbar background color disappears to transparent.
+     * 2. Root Cause: React SPA routes lazily mount DOM. If topbar isn't fully rendered, topbarAnchor is missing. The old logic defaulted searchRoot to `document`, accidentally searching the entire page body and wrongly extracting random body texts (like prompt suggestions) as the active project name.
+     * 3. Method: Initialized searchRoot to `null` and explicitly return `null` if topbar isn't found. This prevents document-wide pollution and safely triggers the fallback to the previous valid `currentProject`, preserving the topbar color during SPA transitions.
+     */
     // 2. 限定搜索范围在顶栏内，防止误抓取页面主体中的内容（如模型名称）
-    let searchRoot = document;
+    let searchRoot = null;
     const topbarAnchor = document.querySelector('[data-testid="titlebar-more-actions"], [data-testid^="open-editor"], [data-testid="install-editor"]');
     if (topbarAnchor) {
-        const topbar = topbarAnchor.closest('.justify-between');
-        if (topbar) {
-            searchRoot = topbar;
-        }
+        searchRoot = topbarAnchor.closest('.justify-between') || topbarAnchor.parentElement;
+    }
+
+    if (!searchRoot) {
+        return null;
     }
 
     const spans = Array.from(searchRoot.querySelectorAll('span.truncate.inline-block'));
     
-    // 2 & 3. 降级提取：提取所有有效的项目名称节点，并过滤掉 UI 文案和模型名称，支持多目录层级组合
-    const ignoreList = ['New Chat', '新对话', 'New conversation', 'Untitled', 'Antigravity'];
-    const validTexts = spans
-        .map(s => s.textContent.trim())
-        .filter(t => t && t !== '/')
-        .filter(t => !ignoreList.includes(t) && !/^Gemini\s+\d+\.\d+/.test(t) && !t.includes('Pro (') && !t.includes('Flash (') && t !== 'Gemini Advanced');
+    // 2. 兼容旧版多目录模式：寻找后面跟着 '/' 的 span，正向遍历找到第一个
+    for (let i = 0; i < spans.length; i++) {
+        const span = spans[i];
         
-    if (validTexts.length > 0) {
-        return validTexts.join(',');
+        const parent = span.parentElement;
+        if (parent) {
+            const nextSibling = parent.nextElementSibling;
+            if (nextSibling && nextSibling.textContent.trim() === '/') {
+                return span.textContent.trim();
+            }
+        }
     }
     
-    return null;
+    // 3. 降级：单目录模式。直接取最后一个可见的 truncate span
+    let result = null;
+    for (let i = spans.length - 1; i >= 0; i--) {
+        const span = spans[i];
+        const text = span.textContent.trim();
+        if (text && text !== '/') {
+            result = text;
+            break;
+        }
+    }
+    
+    if (result) {
+        // 过滤掉已知的非项目名称的 UI 文案，精准匹配模型名称，避免误杀名为 "gemini" 的真实项目
+        const lowerResult = result.toLowerCase();
+        const ignoreList = ['new chat', '新对话', 'new conversation', 'untitled', 'antigravity'];
+        const isModelName = /^gemini\s+\d+\.\d+/.test(lowerResult) || lowerResult.includes('pro (') || lowerResult.includes('flash (') || lowerResult === 'gemini advanced' || lowerResult === 'gemini';
+        
+        if (ignoreList.includes(lowerResult) || isModelName) {
+            return null;
+        }
+    }
+    
+    return result;
 }
 
 export function extractActiveUUID() {
