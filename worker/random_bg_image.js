@@ -30,7 +30,13 @@ module.exports = async function(query) {
                 for (const file of files) {
                     const ext = path.extname(file).toLowerCase();
                     if (validExtensions.includes(ext)) {
-                        allImages.push(path.join(resolvedDir, file));
+                        const fullPath = path.join(resolvedDir, file);
+                        const stats = fs.statSync(fullPath);
+                        if (stats.size <= 5 * 1024 * 1024) { // 5MB limit
+                            allImages.push(fullPath);
+                        } else {
+                            log(`Skipped large image (>${Math.round(stats.size/1024/1024)}MB): ${file}`);
+                        }
                     }
                 }
             } else {
