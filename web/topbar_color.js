@@ -11,7 +11,7 @@ async function syncTopbarTheme(projectName) {
     if (color) {
         document.documentElement.style.setProperty(TOPBAR_BG_VAR, `color-mix(in srgb, ${color} 90%, transparent)`);
         const luminance = getLuminance(color);
-        document.documentElement.style.setProperty(TOPBAR_TEXT_VAR, luminance > 0.6 ? '#1a1a1a' : '#ffffff');
+        document.documentElement.style.setProperty(TOPBAR_TEXT_VAR, luminance > 0.6 ? '#4b5563' : '#e5e7eb');
     } else {
         document.documentElement.style.setProperty(TOPBAR_BG_VAR, 'transparent');
         document.documentElement.style.setProperty(TOPBAR_TEXT_VAR, 'inherit');
@@ -29,18 +29,66 @@ export function initTopbar() {
          * 3. Caveat: If the application removes or alters these specific attributes (data-testid, app-region), the topbar will lose its customized background color again.
          * 4. SPA Bug: React route changes (like navigating to "New Chat") can wipe document.documentElement.style, losing CSS variables. We now use MutationObserver to detect variable loss and restore them, while gracefully handling "New Chat" empty DOM states by falling back to currentProject and adding open-editor buttons to the CSS selector.
         /* 智能追踪特征选择器（兼容旧版备选） */
-        div.shrink-0[style*="app-region: drag"],
-        div.select-none.justify-between[style*="app-region: drag"],
-        div.select-none.justify-between:has(button[data-testid="titlebar-more-actions"]),
-        div.select-none.justify-between:has(span[data-testid="breadcrumb-segment"]),
-        div.flex.justify-between:has([data-testid^="open-editor"]),
-        div.flex.justify-between:has([data-testid="install-editor"]),
-        div.border-b:has(button[data-tab-id="overview"]),
-        header, [data-test-id="chat-header"], .top-bar-class,
-        div:has(> button[data-testid="close-aux-pane"]) {
+        :is(
+            div.shrink-0[style*="app-region: drag"],
+            div.select-none.justify-between[style*="app-region: drag"],
+            div.select-none.justify-between:has(button[data-testid="titlebar-more-actions"]),
+            div.select-none.justify-between:has(span[data-testid="breadcrumb-segment"]),
+            div.flex.justify-between:has([data-testid^="open-editor"]),
+            div.flex.justify-between:has([data-testid="install-editor"]),
+            div.border-b:has(button[data-tab-id="overview"]),
+            header, [data-test-id="chat-header"], .top-bar-class,
+            div:has(> button[data-testid="close-aux-pane"])
+        ) {
             background-color: var(--topbar-bg-color, transparent) !important;
             color: var(--topbar-text-color, inherit) !important;
+            
+            /* Material 3 & Web Components Shadow DOM 穿透变量 */
+            --md-icon-color: var(--topbar-text-color) !important;
+            --md-icon-button-icon-color: var(--topbar-text-color) !important;
+            --md-sys-color-on-surface: var(--topbar-text-color) !important;
+            --md-sys-color-on-surface-variant: var(--topbar-text-color) !important;
+            --md-sys-color-primary: var(--topbar-text-color) !important;
+            --gm3-sys-color-on-surface: var(--topbar-text-color) !important;
+            --gm3-sys-color-on-surface-variant: var(--topbar-text-color) !important;
+            --icon-color: var(--topbar-text-color) !important;
+
             transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* 强制穿透：覆盖内部元素（span, button, svg 等）自带的 Tailwind 颜色，强制跟随 Topbar 变色 */
+        :is(
+            div.shrink-0[style*="app-region: drag"],
+            div.select-none.justify-between[style*="app-region: drag"],
+            div.select-none.justify-between:has(button[data-testid="titlebar-more-actions"]),
+            div.select-none.justify-between:has(span[data-testid="breadcrumb-segment"]),
+            div.flex.justify-between:has([data-testid^="open-editor"]),
+            div.flex.justify-between:has([data-testid="install-editor"]),
+            div.border-b:has(button[data-tab-id="overview"]),
+            header, [data-test-id="chat-header"], .top-bar-class,
+            div:has(> button[data-testid="close-aux-pane"])
+        ) *:not(#ag-dummy-bump-specificity) {
+            color: var(--topbar-text-color, inherit) !important;
+        }
+
+        /* 针对那些游离在主容器之外的独立顶栏按钮（侧边栏开关、前进后退、辅助面板开关等）进行硬匹配 */
+        :is(
+            button[data-testid="sidebar-toggle"],
+            button[aria-label="Go Back"],
+            button[aria-label="Go Forward"],
+            button[data-testid="sidebar-search-button"],
+            button[data-testid="toggle-aux-sidebar"],
+            button#leviosa-pm-btn
+        ),
+        :is(
+            button[data-testid="sidebar-toggle"],
+            button[aria-label="Go Back"],
+            button[aria-label="Go Forward"],
+            button[data-testid="sidebar-search-button"],
+            button[data-testid="toggle-aux-sidebar"],
+            button#leviosa-pm-btn
+        ) * {
+            color: var(--topbar-text-color, inherit) !important;
         }
     `;
     document.head.appendChild(style);
