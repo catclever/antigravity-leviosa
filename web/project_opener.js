@@ -20,12 +20,7 @@ export const CONFIG = {
     // supportsWorkspace: 是否支持多目录工作区模式 (VS Code 支持)
     // isWeb: 是否是原版的云端 IDE
     apps: [
-        { 
-            id: 'web', 
-            name: 'Antigravity', 
-            isWeb: true,
-            icon: `<svg viewBox="0 0 24 24" fill="none" stroke="#3186FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>`
-        },
+        
         { 
             id: 'vscode', 
             name: 'VS Code', 
@@ -66,7 +61,7 @@ if (!window._ag_global_listener_added_v5) {
 
         if (selectedApp.isWeb) return;
 
-        const btn = e.target.closest('[data-testid^="open-editor"], [data-testid="install-editor"]');
+        const btn = e.target.closest('[data-testid^="open-editor"], [data-testid="install-editor"], #ag-app-action-btn');
         if (btn && btn.id !== 'ag-app-selector-btn') {
             e.preventDefault();
             e.stopPropagation();
@@ -183,7 +178,8 @@ function showAppSelector(anchorElement) {
         wrapper.className = 'py-1 overflow-auto flex flex-col overscroll-y-none max-h-60';
         appSelectorMenu.appendChild(wrapper);
         
-        const nativeBtn = captureNativeIdeAnchor();
+        const anchorResult = captureNativeIdeAnchor();
+        const nativeBtn = anchorResult && anchorResult.type === 'native' ? anchorResult.element : null;
         const isInstall = nativeBtn && nativeBtn.getAttribute('data-testid') === 'install-editor';
         const availableApps = CONFIG.apps.filter(app => !(app.id === 'web' && isInstall));
         
@@ -205,9 +201,14 @@ function showAppSelector(anchorElement) {
                 updateSelectorButton();
                 
                 // 选中后自动触发一次原生的 Open In 按钮
-                const nativeBtn = captureNativeIdeAnchor();
-                if (nativeBtn) {
-                    nativeBtn.click();
+                const currentAnchor = captureNativeIdeAnchor();
+                if (currentAnchor && currentAnchor.type === 'native') {
+                    currentAnchor.element.click();
+                } else {
+                    const actionBtn = document.getElementById('ag-app-action-btn');
+                    if (actionBtn) {
+                        actionBtn.click();
+                    }
                 }
             };
             wrapper.appendChild(item);
@@ -226,9 +227,23 @@ function showAppSelector(anchorElement) {
 }
 
 function updateSelectorButton() {
-    const btn = document.getElementById('ag-app-selector-btn');
-    if (btn) {
-        btn.innerHTML = `<span class="flex items-center justify-center w-4 h-4">${selectedApp.icon}</span> <span class="text-[10px] opacity-50 ml-1">▼</span>`;
+    const anchorResult = captureNativeIdeAnchor();
+    const isStandalone = anchorResult && anchorResult.type === 'fallback';
+
+    if (isStandalone) {
+        const actionBtn = document.getElementById('ag-app-action-btn');
+        if (actionBtn) {
+            actionBtn.innerHTML = `<span>Open in</span>`;
+        }
+        const selectorBtn = document.getElementById('ag-app-selector-btn');
+        if (selectorBtn) {
+            selectorBtn.innerHTML = `<span class="flex items-center justify-center w-4 h-4">${selectedApp.icon}</span> <span class="text-[10px] opacity-50 ml-1">▼</span>`;
+        }
+    } else {
+        const btn = document.getElementById('ag-app-selector-btn');
+        if (btn) {
+            btn.innerHTML = `<span class="flex items-center justify-center w-4 h-4">${selectedApp.icon}</span> <span class="text-[10px] opacity-50 ml-1">▼</span>`;
+        }
     }
 }
 
@@ -331,94 +346,144 @@ function captureNativeIdeAnchor() {
     const btns = Array.from(document.querySelectorAll('[data-testid^="open-editor"], [data-testid="install-editor"]'));
     for (let i = btns.length - 1; i >= 0; i--) {
         const btn = btns[i];
-        if (btn.getBoundingClientRect().width > 0) return btn;
+        if (btn.getBoundingClientRect().width > 0) return { type: 'native', element: btn };
     }
+    const fallback = document.querySelector('[data-testid="titlebar-more-actions"]');
+    if (fallback && fallback.getBoundingClientRect().width > 0) return { type: 'fallback', element: fallback };
     return null;
 }
 
 function maintainSelectorButton() {
-    const nativeBtn = captureNativeIdeAnchor();
-    if (!nativeBtn) return;
+    const anchorResult = captureNativeIdeAnchor();
+    if (!anchorResult) return;
 
-    if (CONFIG.renameNativeButton) {
-        if (!document.getElementById('ag-pure-css-overrides')) {
-            const style = document.createElement('style');
-            style.id = 'ag-pure-css-overrides';
-            style.textContent = `
-                /* 1. 强制隐藏原生按钮自带的图标 (第一个包含 SVG 的 div) */
-                [data-testid^="open-editor"] > div:first-child,
-                [data-testid="install-editor"] > div:first-child {
-                    display: none !important;
-                }
-                
-                /* 2. 隐藏多目录模式下的 span 文字 */
-                [data-testid^="open-editor"] > span,
-                [data-testid="install-editor"] > span {
-                    display: none !important;
-                }
-                
-                /* 3. 修改原版按钮 (视觉左侧)：隐藏裸露文字、合体、调整间距 */
-                [data-testid^="open-editor"],
-                [data-testid="install-editor"] {
-                    font-size: 0 !important;          /* 隐藏单目录下的裸露文字 */
-                    border-top-right-radius: 0 !important;
-                    border-bottom-right-radius: 0 !important;
-                    border-right-width: 0 !important; /* 去掉右边框 */
-                    padding-right: 6px !important;    /* 拉近内部距离 */
-                }
-                
-                /* 4. 重新注入 "Open in" 文字 */
-                [data-testid^="open-editor"]::after,
-                [data-testid="install-editor"]::after {
-                    content: "Open in";
-                    font-size: 13px !important;
-                    visibility: visible !important;
-                    order: 1; /* 确保文字排在可能存在的箭头前面 */
-                }
-                
-                /* 5. 确保多目录下的原生下拉箭头排在文字后面 */
-                [data-testid^="open-editor"] > svg,
-                [data-testid="install-editor"] > svg {
-                    order: 2;
-                }
-                
-                /* 6. 自定义按钮 (视觉右侧) 完美合体 */
-                #ag-app-selector-btn {
-                    border-top-left-radius: 0 !important;
-                    border-bottom-left-radius: 0 !important;
-                    border-left-width: 0 !important;  /* 彻底干掉中间的接缝线 */
-                    border-top-right-radius: 6px !important;
-                    border-bottom-right-radius: 6px !important;
-                    padding-left: 6px !important;     /* 拉近距离 */
-                    margin: 0 !important;
-                    height: 24px !important;
-                }
-            `;
-            document.head.appendChild(style);
-        }
-    }
+    if (anchorResult.type === 'native') {
+        const nativeBtn = anchorResult.element;
+        // 先清理可能存在的独立按钮组
+        const standaloneGroup = document.getElementById('ag-standalone-open-in-group');
+        if (standaloneGroup) standaloneGroup.remove();
 
-    let btn = document.getElementById('ag-app-selector-btn');
-    if (!btn) {
-        btn = document.createElement('button');
-        btn.id = 'ag-app-selector-btn';
-        // 基础样式，边框和圆角等由 CSS 统一控制覆盖
-        btn.className = 'flex items-center px-2 py-1.5 border border-border bg-background text-foreground shadow-sm hover:bg-secondary/80 transition-colors cursor-pointer';
-        
-        btn.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            showAppSelector(btn);
-        };
-        
-        if (nativeBtn.parentElement) {
-            // 放在原生按钮的右侧
-            nativeBtn.after(btn);
+        if (CONFIG.renameNativeButton) {
+            if (!document.getElementById('ag-pure-css-overrides')) {
+                const style = document.createElement('style');
+                style.id = 'ag-pure-css-overrides';
+                style.textContent = `
+                    /* 1. 强制隐藏原生按钮自带的图标 (第一个包含 SVG 的 div) */
+                    [data-testid^="open-editor"] > div:first-child,
+                    [data-testid="install-editor"] > div:first-child {
+                        display: none !important;
+                    }
+                    
+                    /* 2. 隐藏多目录模式下的 span 文字 */
+                    [data-testid^="open-editor"] > span,
+                    [data-testid="install-editor"] > span {
+                        display: none !important;
+                    }
+                    
+                    /* 3. 修改原版按钮 (视觉左侧)：隐藏裸露文字、合体、调整间距 */
+                    [data-testid^="open-editor"],
+                    [data-testid="install-editor"] {
+                        font-size: 0 !important;          /* 隐藏单目录下的裸露文字 */
+                        border-top-right-radius: 0 !important;
+                        border-bottom-right-radius: 0 !important;
+                        border-right-width: 0 !important; /* 去掉右边框 */
+                        padding-right: 6px !important;    /* 拉近内部距离 */
+                    }
+                    
+                    /* 4. 重新注入 "Open in" 文字 */
+                    [data-testid^="open-editor"]::after,
+                    [data-testid="install-editor"]::after {
+                        content: "Open in";
+                        font-size: 13px !important;
+                        visibility: visible !important;
+                        order: 1; /* 确保文字排在可能存在的箭头前面 */
+                    }
+                    
+                    /* 5. 确保多目录下的原生下拉箭头排在文字后面 */
+                    [data-testid^="open-editor"] > svg,
+                    [data-testid="install-editor"] > svg {
+                        order: 2;
+                    }
+                    
+                    /* 6. 自定义按钮 (视觉右侧) 完美合体 */
+                    #ag-app-selector-btn {
+                        border-top-left-radius: 0 !important;
+                        border-bottom-left-radius: 0 !important;
+                        border-left-width: 0 !important;  /* 彻底干掉中间的接缝线 */
+                        border-top-right-radius: 6px !important;
+                        border-bottom-right-radius: 6px !important;
+                        padding-left: 6px !important;     /* 拉近距离 */
+                        margin: 0 !important;
+                        height: 24px !important;
+                    }
+                `;
+                document.head.appendChild(style);
+            }
         }
-        updateSelectorButton();
-    } else {
-        if (btn.previousElementSibling !== nativeBtn && nativeBtn.parentElement) {
-            nativeBtn.after(btn);
+
+        let btn = document.getElementById('ag-app-selector-btn');
+        if (!btn || btn.parentElement?.id === 'ag-standalone-open-in-group') {
+            if (btn) btn.remove();
+            btn = document.createElement('button');
+            btn.id = 'ag-app-selector-btn';
+            btn.className = 'flex items-center px-2 py-1.5 border border-border bg-background text-foreground shadow-sm hover:bg-secondary/80 transition-colors cursor-pointer';
+            
+            btn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showAppSelector(btn);
+            };
+            
+            if (nativeBtn.parentElement) {
+                nativeBtn.after(btn);
+            }
+            updateSelectorButton();
+        } else {
+            if (btn.previousElementSibling !== nativeBtn && nativeBtn.parentElement) {
+                nativeBtn.after(btn);
+            }
+        }
+    } else if (anchorResult.type === 'fallback') {
+        const fallbackBtn = anchorResult.element;
+        // 先清理可能存在的原生依附按钮
+        let oldBtn = document.getElementById('ag-app-selector-btn');
+        if (oldBtn && (!oldBtn.parentElement || oldBtn.parentElement.id !== 'ag-standalone-open-in-group')) {
+            oldBtn.remove();
+        }
+
+        let group = document.getElementById('ag-standalone-open-in-group');
+        if (!group) {
+            group = document.createElement('div');
+            group.id = 'ag-standalone-open-in-group';
+            group.className = 'flex items-center rounded-lg bg-transparent transition-colors mr-1 h-7 text-secondary-foreground hover:bg-secondary hover:text-foreground';
+            group.style.appRegion = 'no-drag';
+            
+            const actionBtn = document.createElement('button');
+            actionBtn.id = 'ag-app-action-btn';
+            actionBtn.className = 'flex items-center pl-2 pr-1 py-1 h-full cursor-pointer text-[13px] font-medium outline-none focus:outline-none rounded-l-lg';
+            
+            const selectorBtn = document.createElement('button');
+            selectorBtn.id = 'ag-app-selector-btn';
+            selectorBtn.className = 'flex items-center pr-2 pl-1 h-full cursor-pointer outline-none focus:outline-none rounded-r-lg opacity-80 hover:opacity-100';
+            selectorBtn.innerHTML = `<span class="text-[10px] opacity-60">▼</span>`;
+            
+            selectorBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showAppSelector(group);
+            };
+
+            group.appendChild(actionBtn);
+            group.appendChild(selectorBtn);
+            
+            if (fallbackBtn.parentElement) {
+                fallbackBtn.before(group);
+            }
+            updateSelectorButton();
+        } else {
+            if (group.nextElementSibling !== fallbackBtn && fallbackBtn.parentElement) {
+                fallbackBtn.before(group);
+            }
         }
     }
 }
