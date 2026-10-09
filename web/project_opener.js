@@ -288,8 +288,6 @@ export function extractActiveProjectName() {
     // 2. 兼容旧版多目录模式：寻找后面跟着 '/' 的 span，正向遍历找到第一个
     for (let i = 0; i < spans.length; i++) {
         const span = spans[i];
-        const rect = span.getBoundingClientRect();
-        if (rect.width === 0) continue; 
         
         const parent = span.parentElement;
         if (parent) {
@@ -304,8 +302,6 @@ export function extractActiveProjectName() {
     let result = null;
     for (let i = spans.length - 1; i >= 0; i--) {
         const span = spans[i];
-        const rect = span.getBoundingClientRect();
-        if (rect.width === 0) continue; 
         const text = span.textContent.trim();
         if (text && text !== '/') {
             result = text;
