@@ -31,12 +31,7 @@ module.exports = async function(query) {
                     const ext = path.extname(file).toLowerCase();
                     if (validExtensions.includes(ext)) {
                         const fullPath = path.join(resolvedDir, file);
-                        const stats = fs.statSync(fullPath);
-                        if (stats.size <= 5 * 1024 * 1024) { // 5MB limit
-                            allImages.push(fullPath);
-                        } else {
-                            log(`Skipped large image (>${Math.round(stats.size/1024/1024)}MB): ${file}`);
-                        }
+                        allImages.push(fullPath);
                     }
                 }
             } else {
@@ -52,13 +47,16 @@ module.exports = async function(query) {
         const randomImage = allImages[Math.floor(Math.random() * allImages.length)];
         log(`Selected random image: ${randomImage}`);
 
-        // Read file and convert to base64
-        const imageBuffer = fs.readFileSync(randomImage);
-        const ext = path.extname(randomImage).toLowerCase().substring(1);
-        const mimeType = ext === 'jpg' ? 'jpeg' : ext;
-        const base64Image = `data:image/${mimeType};base64,${imageBuffer.toString('base64')}`;
+        // Copy file to web directory so Taichi's file server can serve it directly
+        const extWithDot = path.extname(randomImage).toLowerCase();
+        const cacheFilename = 'bg_cache' + extWithDot;
+        const targetPath = path.join(__dirname, '../web', cacheFilename);
+        
+        fs.copyFileSync(randomImage, targetPath);
 
-        return { success: true, image: base64Image, source: randomImage };
+        const imageUrl = `http://127.0.0.1:9216/src/apps/com.google.antigravity/web/${cacheFilename}?t=${Date.now()}`;
+
+        return { success: true, image: imageUrl, source: randomImage };
     } catch (e) {
         log(`Error: ${e.message}`);
         return { success: false, error: e.message };
