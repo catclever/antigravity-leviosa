@@ -262,14 +262,12 @@ export function extractActiveProjectName() {
         }
     }
 
-    // 1. 优先尝试从面包屑 (breadcrumb) 中提取，第一个面包屑通常就是项目根目录
+    // 1. 优先尝试从面包屑 (breadcrumb) 中提取，将所有层级组合成多目录请求
     const breadcrumbSegments = Array.from(document.querySelectorAll('span[data-testid="breadcrumb-segment"] .truncate'));
     if (breadcrumbSegments.length > 0) {
-        for (const segment of breadcrumbSegments) {
-            const text = segment.textContent.trim();
-            if (text) {
-                return text;
-            }
+        const texts = breadcrumbSegments.map(s => s.textContent.trim()).filter(Boolean);
+        if (texts.length > 0) {
+            return texts.join(',');
         }
     }
 
@@ -285,41 +283,18 @@ export function extractActiveProjectName() {
 
     const spans = Array.from(searchRoot.querySelectorAll('span.truncate.inline-block'));
     
-    // 2. 兼容旧版多目录模式：寻找后面跟着 '/' 的 span，正向遍历找到第一个
-    for (let i = 0; i < spans.length; i++) {
-        const span = spans[i];
+    // 2 & 3. 降级提取：提取所有有效的项目名称节点，并过滤掉 UI 文案和模型名称，支持多目录层级组合
+    const ignoreList = ['New Chat', '新对话', 'New conversation', 'Untitled', 'Antigravity'];
+    const validTexts = spans
+        .map(s => s.textContent.trim())
+        .filter(t => t && t !== '/')
+        .filter(t => !ignoreList.includes(t) && !/^Gemini\s+\d+\.\d+/.test(t) && !t.includes('Pro (') && !t.includes('Flash (') && t !== 'Gemini Advanced');
         
-        const parent = span.parentElement;
-        if (parent) {
-            const nextSibling = parent.nextElementSibling;
-            if (nextSibling && nextSibling.textContent.trim() === '/') {
-                return span.textContent.trim();
-            }
-        }
+    if (validTexts.length > 0) {
+        return validTexts.join(',');
     }
     
-    // 3. 降级：单目录模式。直接取最后一个可见的 truncate span
-    let result = null;
-    for (let i = spans.length - 1; i >= 0; i--) {
-        const span = spans[i];
-        const text = span.textContent.trim();
-        if (text && text !== '/') {
-            result = text;
-            break;
-        }
-    }
-    
-    if (result) {
-        // 过滤掉已知的非项目名称的 UI 文案，精准匹配模型名称，避免误杀名为 "gemini" 的真实项目
-        const ignoreList = ['New Chat', '新对话', 'New conversation', 'Untitled', 'Antigravity'];
-        const isModelName = /^Gemini\s+\d+\.\d+/.test(result) || result.includes('Pro (') || result.includes('Flash (') || result === 'Gemini Advanced';
-        
-        if (ignoreList.includes(result) || isModelName) {
-            return null;
-        }
-    }
-    
-    return result;
+    return null;
 }
 
 export function extractActiveUUID() {

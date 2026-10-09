@@ -67,20 +67,18 @@ module.exports = async function(query) {
     }
 
     const globalDir = path.join(process.env.HOME, '.gemini', 'kb');
-    let localDir = null;
-
-    if (projectDir) {
-        localDir = path.join(projectDir, '.agent', 'kb');
-    }
-
     if (scope === 'all' || scope === 'global') {
         loadRulesFromDir(globalDir, 'Global');
     }
     if (scope === 'all' || scope === 'local') {
-        if (localDir) {
-            loadRulesFromDir(localDir, 'Local');
+        if (project) {
+            const subProjects = project.split(',').map(p => p.trim()).filter(Boolean);
+            for (const subProject of subProjects) {
+                const localDir = path.join(process.env.HOME, '.gemini', 'Projects', subProject, 'command');
+                loadRulesFromDir(localDir, 'Local');
+            }
         }
     }
 
-    return { success: true, project: projectDir || 'none', scope, rules };
+    return { success: true, project: project, scope, rules };
 };
