@@ -80,12 +80,12 @@ To integrate seamlessly with Taichi, clone this repository directly into Taichi'
 To unlock the full potential of this extension, you'll need a local API endpoint running in the background. You have two ways to set this up:
 
 #### Method 1: The "Taichi" Way (Recommended, Mac Only)
-This extension is designed to work seamlessly with my local **Taichi** service (currently Mac Only), which acts as the primary data source for these dynamic configurations. 
+This extension is designed to work seamlessly with my local **Taichi** service (currently Mac Only), which acts as the primary data source and automatic script injector for these dynamic configurations.
 
 1. Clone and start the Taichi service: [https://github.com/catclever/taichi](https://github.com/catclever/taichi)
-2. Since you've already cloned the repository directly into Taichi's `apps` directory in Step 1, no further file copying is needed.
+2. Since you've already cloned this repository directly into Taichi's `apps` directory in Step 1, no further file copying is needed.
 3. Once Taichi is running locally, it automatically hosts these files and exposes the required endpoint at `http://127.0.0.1:9216`.
-4. You're good to go!
+4. **Automatic Injection (No Step 3 needed!):** Taichi features built-in automated script injection. When Taichi is running alongside Antigravity, it automatically injects `web/main.js` into the dashboard runtime—meaning **you can completely skip Step 3**!
 
 #### Method 2: The DIY Mock Server
 If you don't want to pull the entire Taichi repo, no worries! You can easily spin up a tiny local mock server using Node.js to satisfy the API requirements. 
@@ -93,12 +93,14 @@ If you don't want to pull the entire Taichi repo, no worries! You can easily spi
 We have prepared a quick-start guide. Click the link below for the full scripts:
 - [Using Node.js (Quick & Easy)](./mock_server_node.md)
 
-Whichever method you choose, ensure the service is running before proceeding to the final step.
+Whichever method you choose, ensure the service is running before proceeding to the final step (if using DIY Mock Server).
 
-### Step 3: Configure Antigravity
-Finally, you need to tell the Antigravity dashboard to load these custom scripts.
+### Step 3: Configure Antigravity (DIY Mock Server Only)
+> 💡 **Notice:** If you use **Taichi (Method 1)**, Taichi automatically handles the injection lifecycle for you—**you can completely skip this step!** This step is only required if you are using the DIY mock server or manual snippet execution.
 
-1. ~In the Antigravity dashboard, open the Developer Tools by pressing `Command + Option + I` (on Mac).~ *(Note: Following the June 12, 2026 Google update, this shortcut is now disabled. You will need to access it via web-based debugging mode instead. Please search for instructions on how to enable this. Though if you use Taichi, you won't need to worry about this~)*
+Finally, you need to tell the Antigravity dashboard to load these custom scripts:
+
+1. ~In the Antigravity dashboard, open the Developer Tools by pressing `Command + Option + I` (on Mac).~ *(Note: Following the June 12, 2026 Google update, this shortcut is now disabled. You will need to access it via web-based debugging mode instead. Please search for instructions on how to enable this. Though if you use Taichi, you won't need to worry about this at all~)*
 2. Navigate to the **Sources** tab.
 3. In the left panel (you might need to click the `>>` icon), select **Snippets** and create a new snippet.
 4. Enter the following code into the snippet editor:
@@ -110,8 +112,8 @@ Finally, you need to tell the Antigravity dashboard to load these custom scripts
 
 ## Important Notes 注意事项
 
-- **Re-injection Required:** Since we are dynamically injecting this mod via Developer Tools, it will not persist across app restarts. Every time you fully quit and reopen the Antigravity dashboard, you will need to re-run the Snippet (Step 3).<br>
-  **每次重启需重新注入**：通过开发者工具动态注入的功能不会在应用重启后驻留。每次完全退出并重新打开 Antigravity 后，你都需要重新运行一次 Snippet（即重复第三步）。
+- **Re-injection Required (DIY Mode):** When manually injecting via Developer Tools, the snippet does not persist across app restarts. Every time you fully quit and reopen Antigravity, you need to re-run the snippet (Step 3). With **Taichi**, injection is handled automatically in the background on every launch.<br>
+  **每次重启需重新注入（DIY模式）**：通过开发者工具手动注入的功能不会在应用重启后驻留。每次完全退出并重新打开 Antigravity 后，都需要重新运行一次 Snippet（即重复第三步）。如果使用 **Taichi**，则会在启动时自动完成后台注入，无需手动干预。
 - **Google "Moves Fast and Breaks Things":** Antigravity is an actively updated product. Future updates to their dashboard's DOM structure or React components might cause some of these features to temporarily or permanently break. (Honestly, I hope Google just natively integrates these features soon so we don't have to keep injecting scripts...)<br>
   **速生速死**：Antigravity 是一个在积极更新的产品。如果未来 DOM 结构或者 React 组件发生重大变动，可能会导致某些功能暂时或者永久失效。（早用早享受哦~）
 
@@ -170,6 +172,7 @@ Adds a native-feeling right-click context menu (`📂 在 Finder 中打开`) to 
 
 ### 13. `panel_inject.js` & `pm_dashboard_api.js` (Project Task Kanban Dashboard)
 Injects a sleek toggle button next to the sidebar search icon that slides down a viewport-anchored, frosted-glass **3-column Kanban board (`Backlog` / `Active` / `Completed`)** right below the topbar.
+- **Workflow Companion:** Designed to work hand-in-hand with our task management system and agent disciple framework: [catclever/agy-disciple](https://github.com/catclever/agy-disciple).
 - **Markdown-Driven:** Directly parses task cards (`.md` files with YAML frontmatter) from `~/.gemini/Projects/<project>/tasks/`, rendering priority-colored left borders (`high`, `medium`, `low`) and tag badges.
 - **Interactive Workflows:**
   - **Start in New Chat:** Click `在新对话中启动` on any `Backlog` card to smoothly close the panel, spin up a new chat session, and auto-fill a structured execution prompt linked to `kanban-task-manager`.

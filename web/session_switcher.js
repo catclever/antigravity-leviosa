@@ -82,24 +82,10 @@ export function initSessionSwitcher() {
 
             // 3. 触发导航跳转
             const link = nextRow.querySelector('a') || (nextRow.tagName === 'A' ? nextRow : null);
-            const targetHref = link ? link.getAttribute('href') : null;
-            const cascadeId = nextRow.getAttribute('data-cascade-id');
-            const targetPath = targetHref ? targetHref.split('?')[0] : (cascadeId ? `/c/${cascadeId}` : null);
-
             let navigated = false;
 
-            // 方案 1：最高优先级 - 利用 Antigravity 宿主 TanStack Router (window.__TSR_ROUTER__) 官方客户端路由驱动
-            if (targetPath && window.__TSR_ROUTER__ && typeof window.__TSR_ROUTER__.navigate === 'function') {
-                try {
-                    window.__TSR_ROUTER__.navigate({ to: targetPath });
-                    navigated = true;
-                } catch (err) {
-                    console.warn('[SessionSwitcher] TanStack Router 导航失败，尝试降级:', err);
-                }
-            }
-
-            // 方案 2：利用 React Fiber 树调用链接绑定的 onClick 处理函数
-            if (!navigated && link) {
+            // 方案 1：最高优先级 - 利用 React Fiber 树调用链接绑定的 onClick 处理函数（TanStack Router <Link> 组件真实绑定的处理器）
+            if (link) {
                 try {
                     const fiberKey = Object.keys(link).find(k => k.startsWith('__reactFiber$'));
                     if (fiberKey) {
@@ -124,6 +110,20 @@ export function initSessionSwitcher() {
                     }
                 } catch (err) {
                     console.warn('[SessionSwitcher] React Fiber onClick 触发失败:', err);
+                }
+            }
+
+            // 方案 2：利用 Antigravity 宿主 TanStack Router (window.__TSR_ROUTER__) 官方客户端路由驱动
+            const targetHref = link ? link.getAttribute('href') : null;
+            const cascadeId = nextRow.getAttribute('data-cascade-id');
+            const targetPath = targetHref ? targetHref.split('?')[0] : (cascadeId ? `/c/${cascadeId}` : null);
+
+            if (!navigated && targetPath && window.__TSR_ROUTER__ && typeof window.__TSR_ROUTER__.navigate === 'function') {
+                try {
+                    window.__TSR_ROUTER__.navigate({ to: targetPath });
+                    navigated = true;
+                } catch (err) {
+                    console.warn('[SessionSwitcher] TanStack Router 导航失败，尝试降级:', err);
                 }
             }
 
