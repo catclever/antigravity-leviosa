@@ -381,10 +381,15 @@ module.exports = async function(query) {
                 console.warn('[clean_subagents] PVE remote sync cleanup warning:', pveErr.message);
             }
 
-            // 3. 运行本地 subagent 文件物理清理脚本
-            const scriptPath = path.join(os.homedir(), '.gemini/config/scripts/clean_subagents.py');
+            // 3. 运行本地 subagent 文件物理清理脚本 (优先使用内置 scripts/ 目录，降级回退全局配置)
+            const candidatePaths = [
+                path.join(__dirname, '../scripts/clean_subagents.py'),
+                path.join(__dirname, 'scripts/clean_subagents.py'),
+                path.join(os.homedir(), '.gemini/config/scripts/clean_subagents.py')
+            ];
+            const scriptPath = candidatePaths.find(p => fs.existsSync(p));
             let stdout = '';
-            if (fs.existsSync(scriptPath)) {
+            if (scriptPath) {
                 const excludeArg = query.exclude ? `--exclude "${query.exclude}"` : '';
                 try {
                     stdout = execSync(`python3 "${scriptPath}" ${excludeArg}`, {

@@ -1,0 +1,14 @@
+{
+  "consumer": {
+    "client_id": "YOUR_CONSUMER_CLIENT_ID.apps.googleusercontent.com",
+    "client_secret": "YOUR_CONSUMER_CLIENT_SECRET"
+  },
+  "business": {
+    "client_id": "YOUR_BUSINESS_CLIENT_ID.apps.googleusercontent.com",
+    "client_secret": "YOUR_BUSINESS_CLIENT_SECRET"
+  },
+  "jetbox": {
+    "client_id": "YOUR_JETBOX_CLIENT_ID.apps.googleusercontent.com",
+    "client_secret": "YOUR_JETBOX_CLIENT_SECRET"
+  }
+}

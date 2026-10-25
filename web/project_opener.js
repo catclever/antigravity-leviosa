@@ -335,10 +335,19 @@ export function extractActiveUUID() {
     const match = window.location.pathname.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
     if (match) return match[1];
 
-    // 2. Try DOM fallback
-    const activeBtn = document.querySelector('div[role="button"].bg-sidebar-secondary');
-    if (activeBtn) {
-        const pill = activeBtn.querySelector('span[data-testid^="convo-pill-"]');
+    // 2. Try DOM fallback (兼容现代 conversation-row-sidebar 与旧版结构)
+    const activeRow = document.querySelector('[data-testid="conversation-row-sidebar"][data-selected="true"], [data-testid="conversation-row-sidebar"].bg-sidebar-secondary, div[role="button"].bg-sidebar-secondary');
+    if (activeRow) {
+        const cascadeId = activeRow.getAttribute('data-cascade-id');
+        if (cascadeId) return cascadeId;
+
+        const link = activeRow.querySelector('a');
+        if (link && link.getAttribute('href')) {
+            const m = link.getAttribute('href').match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
+            if (m) return m[1];
+        }
+
+        const pill = activeRow.querySelector('span[data-testid^="convo-pill-"]');
         if (pill) {
             return pill.getAttribute('data-testid').replace('convo-pill-', '');
         }

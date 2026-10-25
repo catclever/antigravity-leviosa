@@ -380,20 +380,36 @@ export function initPanelInject() {
                 return `<div class="text-center py-6 text-xs text-muted-foreground/60 border border-dashed border-white/10 rounded-xl bg-white/[0.02]">Empty</div>`;
             }
             return taskList.map(t => {
-                // 优先级映射为卡片边框：左侧高亮标识线 + 周围细微同色透光描边
-                let prioBorder = 'border-l-[3.5px] border-l-blue-400 border-white/10';
+                // 优先级映射：提取颜色与语义，兼顾卡片左边框高亮线与卡片内发光圆点，防止Tailwind类未预编译丢失
+                let prioColor = '#60a5fa'; // low / default
+                let prioLabel = 'LOW';
                 if (t.priority === 'high') {
-                    prioBorder = 'border-l-[3.5px] border-l-rose-500 border-rose-500/30';
+                    prioColor = '#f43f5e';
+                    prioLabel = 'HIGH';
                 } else if (t.priority === 'medium') {
-                    prioBorder = 'border-l-[3.5px] border-l-amber-400 border-amber-400/25';
-                } else if (t.priority === 'low') {
-                    prioBorder = 'border-l-[3.5px] border-l-blue-400 border-blue-400/20';
+                    prioColor = '#fbbf24';
+                    prioLabel = 'MED';
+                } else {
+                    prioColor = '#60a5fa';
+                    prioLabel = 'LOW';
                 }
 
-                // 高透卡片容器
-                let containerClass = 'border rounded-xl p-3 shadow-sm relative group cursor-pointer transition-all active:scale-[0.99] hover:bg-white/[0.08]';
-                if (columnType === 'completed') {
-                    containerClass += ' opacity-75 hover:opacity-100';
+                // 卡片容器基础样式
+                let containerClass = 'rounded-xl p-3 shadow-sm relative group cursor-pointer transition-all active:scale-[0.99]';
+                let cardStyle = '';
+
+                if (columnType === 'active') {
+                    // Active 栏反转视觉层级：栏位轻透，卡片本身为深色磨砂玻璃，悬浮感突出
+                    containerClass += ' hover:brightness-110 hover:border-blue-400/40';
+                    cardStyle = `background-color: rgba(16, 20, 28, 0.78); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255, 255, 255, 0.14); border-left: 3.5px solid ${prioColor} !important; box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 0 16px rgba(59, 130, 246, 0.08);`;
+                } else if (columnType === 'completed') {
+                    // Completed 栏：由高度磨砂底栏托底，卡片自身高透，略带暗淡
+                    containerClass += ' opacity-75 hover:opacity-100 hover:bg-white/[0.08]';
+                    cardStyle = `background-color: rgba(255, 255, 255, 0.04); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3.5px solid ${prioColor} !important;`;
+                } else {
+                    // Backlog 栏：由高度磨砂底栏托底，卡片自身高透
+                    containerClass += ' hover:bg-white/[0.08]';
+                    cardStyle = `background-color: rgba(255, 255, 255, 0.04); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3.5px solid ${prioColor} !important;`;
                 }
 
                 let badgeColor = 'bg-white/10 text-foreground border border-white/10';
@@ -436,11 +452,14 @@ export function initPanelInject() {
 
                 return `
                     <div onclick="window.leviosaOpenTask('${t.id}', '${safeFilePath}')"
-                         class="${containerClass} ${prioBorder}"
-                         style="background-color: rgba(255, 255, 255, 0.04); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);"
-                         title="点击使用 Qled 查看/编辑此任务 (${t.priority} 优先级)">
+                         class="${containerClass}"
+                         style="${cardStyle}"
+                         title="点击使用 Qled 查看/编辑此任务 (${prioLabel} 优先级)">
                         <div class="flex justify-between items-center gap-2 mb-2 min-w-0">
-                            <span class="text-[10px] font-mono text-muted-foreground bg-black/30 px-1.5 py-0.5 rounded truncate min-w-0" title="${t.id}">${t.id}</span>
+                            <span class="text-[10px] font-mono text-muted-foreground bg-black/40 px-1.5 py-0.5 rounded truncate min-w-0 flex items-center gap-1.5" title="[${prioLabel} 优先级] ${t.id}">
+                                <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: ${prioColor}; box-shadow: 0 0 6px ${prioColor};"></span>
+                                <span class="truncate">${t.id}</span>
+                            </span>
                             <div class="flex items-center gap-1.5 shrink-0">
                                 <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase shrink-0 ${badgeColor}">${t.status}</span>
                                 ${deleteBtn}
@@ -476,9 +495,9 @@ export function initPanelInject() {
                         <div class="flex flex-col gap-3 overflow-y-auto pb-4">${generateTaskCards(backlog, 'backlog')}</div>
                     </div>
 
-                    <!-- Active 栏 (纯黑色 + 高度磨砂) -->
-                    <div class="flex flex-col gap-3 p-3.5 rounded-2xl border border-white/15 shadow-2xl"
-                         style="background-color: rgba(0, 0, 0, 0.85); backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%);">
+                    <!-- Active 栏 (反转视觉：高透轻量栏位，托起内部深度磨砂卡片) -->
+                    <div class="flex flex-col gap-3 p-3.5 rounded-2xl border border-blue-400/20 shadow-lg"
+                         style="background-color: rgba(16, 18, 24, 0.18); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);">
                         <h3 class="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center justify-between">
                             Active 
                             <span class="bg-blue-500/20 border border-blue-500/30 text-blue-300 px-2 py-0.5 rounded-full text-[10px] shadow-sm">${active.length}</span>

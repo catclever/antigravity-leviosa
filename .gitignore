@@ -3,3 +3,7 @@
 .DS_Store
 apps/com.google.antigravity/web/archives/web/archives/
 web/bg_cache.*
+
+# OAuth Client Credentials
+*oauth_clients.json
+

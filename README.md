@@ -16,8 +16,14 @@
 - 🟢 **Peacock Indicator Dots**: The native project grouping is ugly and un-sortable. Lighting up these colored indicators is the only way to survive.<br>
   🟢 **孔雀提示灯**：按项目分组太丑还不能排序，只有开提示灯才能维持生活啊。
 
+- 📋 **Slide-Down Task Kanban**: A sleek frosted-glass Kanban board right under the topbar, crafted for those who are on the verge of madness from concurrent multitasking.<br>
+  📋 **下拉式任务看板**：顶栏一键滑出高透毛玻璃看板，专为并行开发走火入魔的人士设计。
+
 - 🔍 **Project Search Filter**: Because Google engineers probably only have one project... or they're secretly using Claude Code.<br>
   🔍 **项目列表搜索**：Google 的工程师可能只有一个项目，或者他们其实用的是 Claude Code...
+
+- ⚡ **Conversation History Page**: Google thought search could replace the history page... so we replicated it before they axe it, while sneaking in a bunch of awesome extras. Definitely won't be worse than native~<br>
+  ⚡ **会话历史页面**：官方觉得搜索功能可能替代历史页面……在下架之前复刻了一个，顺便植入了一些乱七八糟的功能，反正不会比原生的难用~
 
 - 🖱️ **Permission UX Overhaul**:Double-click to submit, plus highlighted borders. Isn't this basic UX? This Electron app's interaction design is literally worse than a CLI...<br>
   🖱️ **权限操作优化**：支持双击提交，增加高亮边框（这不基操么，Electron 交互做得连 CLI 都不如的玩意儿...
@@ -25,14 +31,14 @@
 - 🚀 **One-Click IDE Opener**: Replaces the native IDE button with a slick multi-app dropdown menu. Open any project directly in VS Code, Kitty terminal, or Finder with a single click!<br>
   🚀 **一键闪现 IDE**：无缝接管原生的打开按钮，注入多应用下拉菜单。一键直达 VS Code、Kitty 终端或者 Finder，告别繁琐的路径跳转！
 
-- 📦 **Deep & Shallow Archive Tool**: Intelligently cleans up and compresses old agent logs (both shallow and deep) for absolute OCD relief.<br>
-  📦 **深/浅度归档工具**：智能清理并压缩旧的 Agent 日志，提供深浅双模式，绝对的强迫症福音。
-
-- 🧠 **Knowledge Base Injector**: Type `#kb` to instantly inject markdown knowledge fragments directly into your prompt!<br>
-  🧠 **知识库注入器**：输入 `#kb` 即可瞬间将 markdown 知识片段注入到你的提示词中！
+- 🧠 **Command & Knowledge Injector**: Type `#cmd` to instantly inject markdown commands and knowledge fragments directly into your prompt!<br>
+  🧠 **知识库注入器**：输入 `#cmd` 即可瞬间将 markdown 知识片段注入到你的提示词中！
 
 - 🔄 **Fast Session Switcher**: Use `Ctrl + Tab` to smoothly cycle between active project sessions like a real browser.<br>
   🔄 **快速会话切换**：使用 `Ctrl + Tab` 像真正的浏览器一样在不同项目间丝滑切换。
+
+- 📦 **Deep & Shallow Archive Tool**: Intelligently cleans up and compresses old agent logs (both shallow and deep) for absolute OCD relief.<br>
+  📦 **深/浅度归档工具**：智能清理并压缩旧的 Agent 日志，提供深浅双模式，绝对的强迫症福音。
 
 ## Background
 
@@ -92,7 +98,7 @@ Whichever method you choose, ensure the service is running before proceeding to 
 ### Step 3: Configure Antigravity
 Finally, you need to tell the Antigravity dashboard to load these custom scripts.
 
-1. ~In the Antigravity dashboard, open the Developer Tools by pressing `Command + Option + I` (on Mac).~ *(Note: Following the June 12, 2026 Google update, this shortcut is now disabled. You will need to access it via web-based debugging mode instead. Please search for instructions on how to enable this.)*
+1. ~In the Antigravity dashboard, open the Developer Tools by pressing `Command + Option + I` (on Mac).~ *(Note: Following the June 12, 2026 Google update, this shortcut is now disabled. You will need to access it via web-based debugging mode instead. Please search for instructions on how to enable this. Though if you use Taichi, you won't need to worry about this~)*
 2. Navigate to the **Sources** tab.
 3. In the left panel (you might need to click the `>>` icon), select **Snippets** and create a new snippet.
 4. Enter the following code into the snippet editor:
@@ -175,6 +181,12 @@ Replaces the native History button with an enhanced `Conversation History ⚡` c
 - **Project Grouping & Theme Linkage:** View sessions in a chronological **Timeline** or grouped by **Project cards** with dynamic Peacock theme-colored borders, folder icons, and indicator dots. Archived conversations are neatly tucked into a collapsible drawer at the bottom of each project card.
 - **Subagent Isolation & One-Click Cleanup:** Automatically filters out background subagent and CLI trajectories from the main view while displaying a live `Subagents` counter badge in the header—complete with a one-click cleanup action to purge subagent `.pb` files, DB rows, and `brain` folders.
 - **Smart De-noising & SPA Routing:** Filters out empty `Untitled` draft sessions, auto-derives semantic titles from the first prompt or `/goal` command, and switches conversations instantaneously without page reloads via TanStack Router (`window.__TSR_ROUTER__.navigate`).
+
+### 15. `account_login_inject.js` & `account_manager.js` (Multi-Account Switcher)
+Provides seamless multi-account profile management and hot-switching without repetitive OAuth browser logins.
+- **Dual UI Entry Points:** Injects `Select Saved Account` and `Login via Refresh Token` buttons directly onto the welcome/login screen, plus compact icon buttons (**Switch Account** and **Add Account `+`**) next to the `Sign Out` button in `Settings -> Account`.
+- **Profile Archiving & Hot-Swap:** Archives account credentials and metadata in `~/.gemini/.accounts/`. Switching accounts automatically updates `state.vscdb`, macOS Keychain entries, and standalone OAuth tokens on the fly, with built-in support for importing or refreshing accounts via Refresh Tokens (RT).
+- **External Configuration:** OAuth client credentials are kept strictly out of git. Simply run `python3 scripts/extract_oauth_clients.py` to auto-extract them, or create `oauth_clients.json` following `oauth_clients.example.json`.
 
 > **Note**: The `sidebar_reorder.js` feature (which previously folded pinned conversations) has been retired and removed from the default load, as the Antigravity dashboard has officially added native support for this! 🎉
 

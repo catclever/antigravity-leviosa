@@ -14,8 +14,18 @@ export function initArchiveHook() {
         let metadata = { uuid: null, title: 'Unknown', project: 'Unknown' };
         
         // 1. 最高优先级：尝试从原生 DOM 的 data-testid 中提取（侧边栏适用）
-        const rowDom = el.closest('div[role="button"], button.hover\\:bg-muted, .group');
+        const rowDom = el.closest('[data-testid="conversation-row-sidebar"], div[role="button"], button.hover\\:bg-muted, .group');
         if (rowDom) {
+            const cascadeId = rowDom.getAttribute('data-cascade-id');
+            if (cascadeId) {
+                metadata.uuid = cascadeId;
+            }
+            const link = rowDom.querySelector('a');
+            if (!metadata.uuid && link && link.getAttribute('href')) {
+                const m = link.getAttribute('href').match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
+                if (m) metadata.uuid = m[1];
+            }
+
             const pillSpan = rowDom.querySelector('[data-testid^="convo-pill-"]');
             if (pillSpan) {
                 const testId = pillSpan.getAttribute('data-testid');
@@ -23,8 +33,8 @@ export function initArchiveHook() {
                 metadata.title = pillSpan.textContent.trim();
             } else {
                 // 如果没有 pillSpan，尝试提取 title 文本兜底
-                const titleSpan = rowDom.querySelector('.text-sm.truncate');
-                if (titleSpan) metadata.title = titleSpan.textContent.trim();
+                const titleSpan = rowDom.querySelector('.text-sm.truncate, [aria-label]');
+                if (titleSpan) metadata.title = (titleSpan.getAttribute('aria-label') || titleSpan.textContent).trim();
             }
             
             const projectSpan = rowDom.querySelector('.text-xs.text-muted-foreground');
