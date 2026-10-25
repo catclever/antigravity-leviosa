@@ -9,6 +9,8 @@ import { initArchiveHook } from './archive_hook.js';
 import { initKbTrigger } from './kb_trigger.js';
 import { initSessionSwitcher } from './session_switcher.js';
 import { initOpenPathInFinder } from './open_path_in_finder.js';
+import { initPanelInject } from './panel_inject.js';
+import { initHistoryView } from './history_view.js';
 
 console.log('🚀 [Antigravity Mod] 正在加载模块化组件...');
 
@@ -24,6 +26,12 @@ if (window === window.top) {
     initKbTrigger();
     initSessionSwitcher();
     initOpenPathInFinder();
+    
+    // 新增面板注入
+    initPanelInject();
+    
+    // 新增 Conversation History ⚡ 复刻中心视图
+    initHistoryView();
 
     console.log('✅ [Antigravity Mod] 所有模块加载完毕！');
 } else {

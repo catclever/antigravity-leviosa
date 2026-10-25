@@ -57,7 +57,7 @@ At its core, this extension works by injecting custom JavaScript and CSS directl
 
 **核心原理**：本质上，这个扩展是通过直接向面板注入自定义的 JavaScript 和 CSS 来覆盖默认 UI 并引入新功能的。虽然很多功能完全在浏览器内运行，但部分动态功能需要依赖于查询本地数据源。
 
-> 🇨🇳 [点击这里中文版指南](./QUICKSTART_zh.md)
+> 🇨🇳 [点击这里中文版指南 (Quick Start)](./QUICKSTART_zh.md) | [中文说明文档 (Full README)](./README_zh.md)
 
 To get everything up and running, follow these three steps:
 
@@ -125,13 +125,13 @@ Handles all communication between the dashboard and your local data source (Taic
   2. **SQLite Exact Matching:** It directly queries the IDE's local SQLite database (`state.vscdb`) to fetch the absolute paths of your recently opened workspaces. This ensures `O(1)` precision without requiring any manual path configuration!
   3. **Fuzzy Fallback:** If the exact path isn't found in the database, it falls back to a fuzzy search across common fallback directories.
 
-### 3. `background.js` (Workspace Background & Random Wallpaper)
+### 3. `background.js` & `random_bg_image.js` (Workspace Background & Random Wallpaper)
 Injects a beautiful random background image from your local machine into the dashboard, along with base CSS tweaks to make the UI gorgeous.
-- **Local Random Wallpaper:** It automatically picks a random image from your `~/Pictures/wallpaper` folder and refreshes it on every load!
-- **Customization:** You can add more local directories or change the fallback Base64 image by modifying the `CONFIG` object at the top of `background.js`. Feel free to dive into the CSS within this file to explore and tweak properties like the background blur (`backdrop-filter: blur(...)`), overlay opacity, and layout spacing to match your exact aesthetic preferences!
+- **Local Random Wallpaper:** It automatically picks a random image from your `~/Pictures/wallpaper` folder and refreshes it on every load! Rather than returning bulky Base64 strings, the backend worker copies the chosen image to `web/bg_cache.<ext>` for direct static serving (with automatic cache cleanup), completely bypassing file size limits.
+- **Customization:** You can add more local directories or change the fallback image by modifying the `CONFIG` object at the top of `background.js`. Feel free to dive into the CSS within this file to explore and tweak properties like the background blur (`backdrop-filter: blur(...)`), overlay opacity, and layout spacing to match your exact aesthetic preferences!
 
-### 4. `topbar_color.js` (Dynamic Topbar)
-Dynamically changes the topbar's background color based on the project you are currently viewing. It automatically calculates the color luminance to ensure the text remains readable (intelligently switching between dark and light text).
+### 4. `topbar_color.js` & `antigravity_theme_sync.js` (Dynamic Topbar)
+Dynamically changes the topbar's background color based on the project you are currently viewing. It supports cascading multi-directory workspace configurations (`peacock.color` / `titleBar.activeBackground` in `.vscode/settings.json`) and automatically calculates the color luminance to ensure the text and icons remain readable with softened light/dark contrast.
 
 ### 5. `project_dots.js` (Project Indicators)
 Adds a slick, colored indicator dot next to the project names in the sidebar or subtitles, giving you a quick visual cue of your current project context.
@@ -148,16 +148,33 @@ Overrides the native "Open Editor" or "Install IDE" button by injecting a custom
 - **Customization:** You can modify the `CONFIG.apps` array at the top of `project_opener.js` to add custom IDEs, change the default application, or update the SVG icons.
 - **Backend Requirement:** This feature relies on the local service (Taichi or Mock Server) to execute the actual shell commands. It expects the endpoint `/api/script/apps/com.google.antigravity/worker/antigravity_open_project` to be available. If using a DIY mock server, you must implement this endpoint to handle the `open` commands.
 
-### 9. `archive_brain.js` & `archive_hook.js` (Deep & Shallow Archive Tool)
-An intelligent archiving module that provides absolute OCD relief by cleaning up verbose `.system_generated` logs and `scratch` directories within individual `brain` folders. It compresses the cleaned files into `.tar.gz` archives and maintains an `archive_index.json` metadata record. It now runs fully asynchronously as a backend Worker script.
+### 9. `agy_archive.js`, `archive_brain.js` & `archive_hook.js` (Deep & Shallow Archive Tool)
+An intelligent archiving module that provides absolute OCD relief by cleaning up verbose `.system_generated` logs and `scratch` directories within individual `brain` folders. It queries the native `conversation_summaries.db` SQLite database to accurately resolve conversation UUIDs and project names, compresses the cleaned files into `.tar.gz` archives, and maintains an `archive_index.json` metadata record. It runs fully asynchronously as a backend Worker script.
 
-### 10. `kb_trigger.js` & `antigravity_knowledge_index.js` (Knowledge Base Injector)
-A powerful feature that lets you instantly inject knowledge fragments into your chat prompt. Simply type `#kb ` (for all), `#kbg ` (for global), or `#kbl ` (for local) in the message input box to trigger a beautiful dropdown menu containing your reusable markdown knowledge files. Select an item, and it's instantly formatted and injected into your prompt!
+### 10. `kb_trigger.js` & `antigravity_knowledge_index.js` (Command & Knowledge Injector)
+A powerful feature that lets you instantly inject reusable instructions and knowledge fragments into your chat prompt. Simply type `#cmd` (for all), `#cmdg` (for global), or `#cmdl` (for local) in the message input box to trigger a frosted-glass dropdown menu with color-coded badges (`Global`, `Instruction`, and `Knowledge`). Select an item, and it's smoothly injected into your prompt with input-locking protection and batch selection replacement to prevent Lexical editor lag!
 - **Global Scope:** Reads from `~/.gemini/kb/*.md`
-- **Local Scope:** Reads from `<project_dir>/.agent/kb/*.md`
+- **Local Scope:** Reads commands from `~/.gemini/Projects/<project>/commands/*.md` and knowledge from `~/.gemini/Projects/<project>/kb/*.md`
 
 ### 11. `session_switcher.js` (Fast Session Switcher)
 Brings the standard browser tab-switching experience to the Antigravity sidebar! Use `Ctrl + Tab` to cycle to the next active project session, and `Ctrl + Shift + Tab` to cycle to the previous one. It intelligently calculates the DOM position to ensure smooth scrolling.
+
+### 12. `open_path_in_finder.js` & `antigravity_open_file_in_finder.js` (Open Path in Finder)
+Adds a native-feeling right-click context menu (`📂 在 Finder 中打开`) to file paths and filenames across the chat stream and sidebar. Even when the UI truncates the directory path and only renders a bare filename, it reverse-engineers the underlying **React Fiber tree (`__reactFiber$`)** to extract the exact absolute path and reveal it directly in macOS Finder.
+
+### 13. `panel_inject.js` & `pm_dashboard_api.js` (Project Task Kanban Dashboard)
+Injects a sleek toggle button next to the sidebar search icon that slides down a viewport-anchored, frosted-glass **3-column Kanban board (`Backlog` / `Active` / `Completed`)** right below the topbar.
+- **Markdown-Driven:** Directly parses task cards (`.md` files with YAML frontmatter) from `~/.gemini/Projects/<project>/tasks/`, rendering priority-colored left borders (`high`, `medium`, `low`) and tag badges.
+- **Interactive Workflows:**
+  - **Start in New Chat:** Click `在新对话中启动` on any `Backlog` card to smoothly close the panel, spin up a new chat session, and auto-fill a structured execution prompt linked to `kanban-task-manager`.
+  - **Qled Integration:** Click any card to open its underlying Markdown file directly via the `qled://open?path=...` protocol.
+  - **Quick Actions:** Mark `in_review` tasks as completed with a single click, or abandon/delete unstarted `Backlog` tasks with confirmation.
+
+### 14. `history_view.js` & `conversation_history_api.js` (Conversation History ⚡ Central View)
+Replaces the native History button with an enhanced `Conversation History ⚡` central dashboard powered directly by Antigravity's local `conversation_summaries.db` SQLite database.
+- **Project Grouping & Theme Linkage:** View sessions in a chronological **Timeline** or grouped by **Project cards** with dynamic Peacock theme-colored borders, folder icons, and indicator dots. Archived conversations are neatly tucked into a collapsible drawer at the bottom of each project card.
+- **Subagent Isolation & One-Click Cleanup:** Automatically filters out background subagent and CLI trajectories from the main view while displaying a live `Subagents` counter badge in the header—complete with a one-click cleanup action to purge subagent `.pb` files, DB rows, and `brain` folders.
+- **Smart De-noising & SPA Routing:** Filters out empty `Untitled` draft sessions, auto-derives semantic titles from the first prompt or `/goal` command, and switches conversations instantaneously without page reloads via TanStack Router (`window.__TSR_ROUTER__.navigate`).
 
 > **Note**: The `sidebar_reorder.js` feature (which previously folded pinned conversations) has been retired and removed from the default load, as the Antigravity dashboard has officially added native support for this! 🎉
 

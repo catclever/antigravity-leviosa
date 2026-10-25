@@ -46,10 +46,11 @@ export function initBackground() {
                 background-color: transparent !important;
             }
 
-            /* === 2. 左侧边栏 (原汁原味的 3.1) === */
+            /* === 2. 左侧边栏 (原汁原味的 3.1) 与 历史中心大厅 === */
             ${sidebarSelector},
             .bg-background${sidebarSelector},
-            .bg-muted${sidebarSelector} {
+            .bg-muted${sidebarSelector},
+            #leviosa-history-view {
                 background-image:
                     linear-gradient(${tintColor}, ${tintColor}),
                     linear-gradient(135deg, transparent 0%, rgba(0, 0, 0, 0.05) 40%),
@@ -61,8 +62,28 @@ export function initBackground() {
 
                 background-color: transparent !important;
                 backdrop-filter: blur(2px) !important;
-                border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
                 box-shadow: inset 1px 0 0 0 rgba(255, 255, 255, 0.05) !important;
+            }
+
+            ${sidebarSelector},
+            .bg-background${sidebarSelector},
+            .bg-muted${sidebarSelector} {
+                border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+            }
+
+            /* === 2.1 历史中心大厅内部毛玻璃与联动 === */
+            #leviosa-history-view #leviosa-sticky-header {
+                background-color: transparent !important;
+                background-image: none !important;
+                backdrop-filter: blur(16px) !important;
+                -webkit-backdrop-filter: blur(16px) !important;
+            }
+
+            #leviosa-history-view .leviosa-project-group {
+                background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 45%, transparent) !important;
+                backdrop-filter: blur(8px) !important;
+                border: 1px solid rgba(255, 255, 255, 0.08) !important;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
             }
 
             /* 特殊处理：移除设置面板左侧导航项及其包装器被误伤注入的挤压背景图 */

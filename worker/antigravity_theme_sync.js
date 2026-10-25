@@ -3,6 +3,24 @@ const path = require('path');
 const { findProjectDir } = require('./project_resolver');
 
 function findProjectSettings(projectName) {
+    if (!projectName || projectName === 'General') return null;
+
+    // 0. 直接检查常见工程目录（极速路径匹配，无需递归扫描）
+    const directCandidates = [
+        path.join(process.env.HOME, 'Projects', projectName),
+        path.join(process.env.HOME, 'Library/Services/taichi/apps', projectName),
+        path.join(process.env.HOME, 'Library/Services/taichi', projectName),
+        path.join(process.env.HOME, 'workbench', projectName),
+        path.join(process.env.HOME, projectName)
+    ];
+
+    for (const cand of directCandidates) {
+        if (fs.existsSync(cand)) {
+            const settingsPath = path.join(cand, '.vscode', 'settings.json');
+            if (fs.existsSync(settingsPath)) return settingsPath;
+        }
+    }
+
     let currentDir = findProjectDir(projectName);
     
     // 1. 向上遍历查找
@@ -49,7 +67,7 @@ module.exports = async function(query) {
             const settings = parseJSONWithComments(fileContent);
             
             const colors = settings['workbench.colorCustomizations'] || {};
-            const themeColor = colors['titleBar.activeBackground'] || colors['editor.background'] || null;
+            const themeColor = colors['titleBar.activeBackground'] || colors['editor.background'] || settings['peacock.color'] || null;
 
             if (themeColor) {
                 foundColor = themeColor;

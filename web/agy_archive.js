@@ -148,31 +148,47 @@ async function main() {
             }
         }
 
-        // 2. 尝试从 agyhub_summaries_proto.pb 这个“真·数据库”里强行提取
+        // 2. 从官方真正的核心 SQLite 数据库反查 UUID 和所属项目
         if (!foundUuid) {
             try {
-                const summariesProtoPath = path.join(os.homedir(), '.gemini/antigravity/agyhub_summaries_proto.pb');
-                if (fs.existsSync(summariesProtoPath)) {
-                    const content = fs.readFileSync(summariesProtoPath, 'latin1'); // Use latin1 for binary safe string operations
-                    let currentIndex = 0;
-                    while ((currentIndex = content.indexOf(titleDecoded, currentIndex)) !== -1) {
-                        // 向前后各找一段，防止 UUID 在前面或被其他文本打断
-                        const start = Math.max(0, currentIndex - 50);
-                        const end = Math.min(content.length, currentIndex + 200);
-                        const chunk = content.substring(start, end);
-                        const uuidMatch = chunk.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+                const dbPath = path.join(os.homedir(), '.gemini/antigravity/conversation_summaries.db');
+                if (fs.existsSync(dbPath)) {
+                    // 转义单引号以防 SQL 语法错误
+                    const escapedTitle = titleDecoded.replace(/'/g, "''");
+                    const query = `SELECT conversation_id, workspace_uris FROM conversation_summaries WHERE title = '${escapedTitle}' LIMIT 1;`;
+                    let result = execSync(`sqlite3 "${dbPath}" "${query}"`, { 
+                        encoding: 'utf-8', 
+                        stdio: ['pipe', 'pipe', 'ignore'] 
+                    }).trim();
+
+                    if (!result) {
+                        // 降级模糊匹配（应对长标题截断情况）
+                        const fuzzyQuery = `SELECT conversation_id, workspace_uris FROM conversation_summaries WHERE title LIKE '%${escapedTitle}%' ORDER BY last_modified_time DESC LIMIT 1;`;
+                        result = execSync(`sqlite3 "${dbPath}" "${fuzzyQuery}"`, {
+                            encoding: 'utf-8',
+                            stdio: ['pipe', 'pipe', 'ignore']
+                        }).trim();
+                    }
+
+                    if (result) {
+                        const [cId, wsUrisRaw] = result.split('|');
+                        foundUuid = cId.trim();
                         
-                        // 过滤掉当前对话自身的 UUID（防止套娃匹配到自己的 summary）
-                        if (uuidMatch && uuidMatch[0] !== process.env.QUERY_uuid) {
-                            foundUuid = uuidMatch[0];
-                            console.error(`[Archive Brain] 从 agyhub_summaries_proto.pb 成功反向提取到 UUID: ${foundUuid}`);
-                            break;
+                        // 从 workspace_uris JSON 数组中提取项目名称
+                        if (wsUrisRaw && !foundProject) {
+                            try {
+                                const uris = JSON.parse(wsUrisRaw);
+                                if (Array.isArray(uris) && uris.length > 0) {
+                                    // 提取 file:///.../projectName 的最后一段
+                                    foundProject = decodeURIComponent(uris[0].split('/').filter(Boolean).pop());
+                                }
+                            } catch (e) {}
                         }
-                        currentIndex += titleDecoded.length;
+                        console.error(`[Archive Brain] 从 conversation_summaries.db 成功命中 UUID: ${foundUuid}, Project: ${foundProject}`);
                     }
                 }
             } catch (err) {
-                console.error('[Archive Brain] 读取 summaries_proto 失败:', err);
+                console.error('[Archive Brain] 查询 conversation_summaries.db 失败:', err.message);
             }
         }
 

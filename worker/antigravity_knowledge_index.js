@@ -7,25 +7,16 @@ module.exports = async function(query) {
     const scope = query.scope ? decodeURIComponent(query.scope) : 'all';
 
     const projectDir = findProjectDir(project);
-
-    let knowledgeMdContent = '';
-    if (projectDir) {
-        const knowledgeMdPath = path.join(projectDir, '.agent', 'knowledge.md');
-        if (fs.existsSync(knowledgeMdPath)) {
-            try {
-                knowledgeMdContent = fs.readFileSync(knowledgeMdPath, 'utf-8');
-            } catch (e) {}
-        }
-    }
-
     const rules = [];
 
-    function loadRulesFromDir(dirPath, scopeLabel) {
+    const IGNORED_FILES = new Set(['knowledge.md', 'index.md', 'command_log.md', 'grave.md']);
+
+    function loadRulesFromDir(dirPath, scopeLabel, forcedType = '') {
         if (!fs.existsSync(dirPath)) return;
         try {
             const files = fs.readdirSync(dirPath);
             for (const file of files) {
-                if (file.endsWith('.md') && !file.startsWith('.')) {
+                if (file.endsWith('.md') && !file.startsWith('.') && !IGNORED_FILES.has(file)) {
                     const filePath = path.join(dirPath, file);
                     const content = fs.readFileSync(filePath, 'utf-8');
                     const tag = file.replace('.md', '');
@@ -44,22 +35,13 @@ module.exports = async function(query) {
                             }
                         }
                     }
-                    
-                    let type = '';
-                    if (scopeLabel === 'Local') {
-                        if (knowledgeMdContent.includes(tag) || knowledgeMdContent.includes(file)) {
-                            type = 'Knowledge';
-                        } else {
-                            type = 'Instruction';
-                        }
-                    }
 
                     rules.push({
                         tag,
                         description,
                         content: cleanContent,
                         scope: scopeLabel,
-                        type: type
+                        type: forcedType
                     });
                 }
             }
@@ -67,18 +49,29 @@ module.exports = async function(query) {
     }
 
     const globalDir = path.join(process.env.HOME, '.gemini', 'kb');
-    if (scope === 'all' || scope === 'global') {
+
+    if (['all', 'global', 'cmd-all', 'kb-all'].includes(scope)) {
         loadRulesFromDir(globalDir, 'Global');
     }
-    if (scope === 'all' || scope === 'local') {
-        if (project) {
-            const subProjects = project.split(',').map(p => p.trim()).filter(Boolean);
-            for (const subProject of subProjects) {
-                const localDir = path.join(process.env.HOME, '.gemini', 'Projects', subProject, 'command');
-                loadRulesFromDir(localDir, 'Local');
+    
+    if (project) {
+        const subProjects = project.split(',').map(p => p.trim()).filter(Boolean);
+        for (const subProject of subProjects) {
+            const commandsDirName = fs.existsSync(path.join(process.env.HOME, '.gemini', 'Projects', subProject, 'commands')) ? 'commands' : 'command';
+            const localCommandsDir = path.join(process.env.HOME, '.gemini', 'Projects', subProject, commandsDirName);
+            const localKbDir = path.join(process.env.HOME, '.gemini', 'Projects', subProject, 'kb');
+            
+            // Load commands if scope is all, local, or cmd-all
+            if (['all', 'local', 'cmd-all'].includes(scope)) {
+                loadRulesFromDir(localCommandsDir, 'Local', 'Instruction');
+            }
+            
+            // Load kb if scope is all, local, kb-all, or kb-local
+            if (['all', 'local', 'kb-all', 'kb-local'].includes(scope)) {
+                loadRulesFromDir(localKbDir, 'Local', 'Knowledge');
             }
         }
     }
 
-    return { success: true, project: project, scope, rules };
+    return { success: true, project: projectDir || 'none', scope, rules };
 };

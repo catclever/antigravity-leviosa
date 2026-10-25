@@ -9,19 +9,44 @@ export function initKbTrigger() {
     let rulesData = [];
     let isMenuVisible = false;
     let currentMatchLength = 0;
+    
+    // UI 锁定标记，防止在插入大规模文本期间用户按回车发送或乱敲字符
+    let isProcessing = false;
+    const blockEventsIfProcessing = (e) => {
+        if (isProcessing) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        }
+    };
+    
+    // 在最顶层捕获阶段拦截所有输入和点击事件
+    document.addEventListener('keydown', blockEventsIfProcessing, true);
+    document.addEventListener('keypress', blockEventsIfProcessing, true);
+    document.addEventListener('keyup', blockEventsIfProcessing, true);
+    document.addEventListener('click', blockEventsIfProcessing, true);
 
-    // 创建下拉菜单 UI
+    // 创建下拉菜单 UI (采用 fixed 定位，直接挂载在 document.body，防止被父级 overflow: hidden 截断)
     function createDropdown() {
         if (dropdownContainer) return dropdownContainer;
 
         dropdownContainer = document.createElement('div');
-        dropdownContainer.className = 'ag-kb-dropdown absolute left-0 w-full -top-2 -translate-y-full bg-card max-h-[200px] overflow-y-auto rounded-md border border-solid border-gray-500/20 z-30 shadow-lg';
+        dropdownContainer.className = 'ag-kb-dropdown';
         dropdownContainer.style.cssText = `
+            position: fixed;
             display: none;
             backdrop-filter: blur(24px) saturate(150%);
-            background-color: rgba(20, 20, 22, 0.95);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+            -webkit-backdrop-filter: blur(24px) saturate(150%);
+            background-color: rgba(20, 20, 22, 0.96);
+            color: #ffffff;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(128, 128, 128, 0.25);
+            border-radius: 8px;
+            max-height: 240px;
+            overflow-y: auto;
+            z-index: 999999;
+            box-sizing: border-box;
         `;
+        document.body.appendChild(dropdownContainer);
         return dropdownContainer;
     }
 
@@ -32,7 +57,7 @@ export function initKbTrigger() {
         dropdownContainer.innerHTML = '';
         
         if (rules.length === 0) {
-            dropdownContainer.innerHTML = '<div class="p-3 text-xs text-gray-500 text-center">暂无知识卡片</div>';
+            dropdownContainer.innerHTML = '<div class="p-3 text-xs text-gray-400 text-center">暂无知识卡片</div>';
             return;
         }
 
@@ -40,32 +65,31 @@ export function initKbTrigger() {
 
         rules.forEach((rule, index) => {
             const item = document.createElement('div');
-            // 移除 hover:bg-secondary/80, 改用 JS 控制 bg-secondary
-            item.className = 'flex w-full px-2 py-1.5 items-center gap-2 cursor-pointer transition-colors';
+            item.className = 'flex w-full px-2 py-1.5 items-center gap-2 cursor-pointer transition-colors text-white';
             item.setAttribute('role', 'option');
             item.setAttribute('id', `kb-item-${index}`);
             
             let badgeText = 'Local';
-            let badgeColor = 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+            let customStyle = 'background-color: rgba(107, 114, 128, 0.2); color: rgb(156, 163, 175); border-color: rgba(107, 114, 128, 0.3);';
             
             if (rule.scope === 'Global') {
                 badgeText = 'Global';
-                badgeColor = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+                customStyle = 'background-color: rgba(168, 85, 247, 0.2); color: rgb(192, 132, 252); border-color: rgba(168, 85, 247, 0.3);';
             } else if (rule.scope === 'Local') {
                 if (rule.type === 'Knowledge') {
                     badgeText = 'Knowledge';
-                    badgeColor = 'bg-green-500/20 text-green-400 border-green-500/30';
+                    customStyle = 'background-color: rgba(34, 197, 94, 0.2); color: rgb(74, 222, 128); border-color: rgba(34, 197, 94, 0.3);';
                 } else {
                     badgeText = 'Instruction';
-                    badgeColor = 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+                    customStyle = 'background-color: rgba(249, 115, 22, 0.2); color: rgb(251, 146, 60); border-color: rgba(249, 115, 22, 0.3);';
                 }
             }
 
             item.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500 shrink-0"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
-                <span class="text-[10px] px-1 py-0.5 rounded border border-solid ${badgeColor} shrink-0 leading-none">${badgeText}</span>
-                <span class="text-xs shrink-0 font-medium">${rule.tag}</span>
-                <span class="text-[11px] opacity-60 min-w-0 truncate" dir="auto">${rule.description || '知识片段'}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400 shrink-0"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+                <span class="text-[10px] px-1 py-0.5 rounded border border-solid shrink-0 leading-none" style="${customStyle}">${badgeText}</span>
+                <span class="text-xs shrink-0 font-medium text-white">${rule.tag}</span>
+                <span class="text-[11px] text-gray-300 opacity-70 min-w-0 truncate" dir="auto">${rule.description || '知识片段'}</span>
             `;
 
             // 鼠标悬停更新选择
@@ -105,34 +129,62 @@ export function initKbTrigger() {
     }
 
     function insertRuleTag(rule) {
+        if (isProcessing) return;
+        isProcessing = true;
+        
         try {
             const injectionText = `\n<rule name="${rule.tag}" scope="${rule.scope}">\n${rule.content}\n</rule>\n`;
             
-            // 返璞归真：最简单粗暴的 delete，对 Lexical 这种接管了 Selection 的富文本引擎最为安全
-            // 每次执行 delete 都会触发原生的 beforeinput 和 input 事件，Lexical 可以完美捕捉
-            for (let i = 0; i < currentMatchLength; i++) {
+            // 性能优化：不再循环调用 delete (会导致 Lexical 触发多次由于 input 事件引起的重新渲染从而卡顿)
+            // 而是通过 Selection API 向后扩选对应数量的字符，然后一次性 delete
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+                for (let i = 0; i < currentMatchLength; i++) {
+                    sel.modify('extend', 'backward', 'character');
+                }
                 document.execCommand('delete', false, null);
+            } else {
+                // 兜底逻辑
+                for (let i = 0; i < currentMatchLength; i++) {
+                    document.execCommand('delete', false, null);
+                }
             }
             
             // 插入完整规则文本
             document.execCommand('insertText', false, injectionText);
         } catch (e) {
             console.error('[kb_trigger] 插入规则失败:', e);
+        } finally {
+            // 利用 setTimeout 将解锁操作推迟到事件循环的下一个 Tick
+            // 这样在同步阻塞期间被浏览器放入队列的按键/点击事件（比如连按回车），
+            // 就会在 isProcessing=true 的拦截器中被直接丢弃。
+            setTimeout(() => {
+                isProcessing = false;
+            }, 100); // 100ms 的缓冲期足以消化排队的冗余事件
         }
     }
 
     function showMenu(inputElement) {
         if (!dropdownContainer) {
             dropdownContainer = createDropdown();
+        } else if (!document.body.contains(dropdownContainer)) {
+            document.body.appendChild(dropdownContainer);
         }
         
-        if (!document.body.contains(dropdownContainer)) {
-            const wrapper = inputElement.closest('.relative.w-full');
-            if (wrapper) {
-                wrapper.appendChild(dropdownContainer);
-            } else {
-                inputElement.parentElement.appendChild(dropdownContainer);
-            }
+        // 基于屏幕视口绝对坐标计算，防止被包含 overflow: hidden 的父级元素截断
+        const rect = inputElement.getBoundingClientRect();
+        dropdownContainer.style.width = `${Math.max(rect.width, 320)}px`;
+        dropdownContainer.style.left = `${rect.left}px`;
+
+        const spaceAbove = rect.top;
+        if (spaceAbove > 220 || rect.top > window.innerHeight / 2) {
+            // 普通对话流，输入框在下方，向上弹起
+            dropdownContainer.style.top = 'auto';
+            dropdownContainer.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+        } else {
+            // 新对话或居中布局，向下弹起
+            dropdownContainer.style.bottom = 'auto';
+            dropdownContainer.style.top = `${rect.bottom + 8}px`;
         }
         
         dropdownContainer.style.display = 'block';
@@ -198,29 +250,47 @@ export function initKbTrigger() {
         }
 
         let rawText = activeEl.textContent || '';
-        let cleanText = rawText.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\u00A0/g, ' ');
+        // 过滤不可见字符，同时去除末尾多余换行
+        let cleanText = rawText.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\u00A0/g, ' ').replace(/\n+$/, '');
 
-        let matchScope = null;
-        if (cleanText.endsWith('#cmd ')) { matchScope = 'all'; currentMatchLength = 5; }
-        else if (cleanText.endsWith('#cmdg ')) { matchScope = 'global'; currentMatchLength = 6; }
-        else if (cleanText.endsWith('#cmdl ')) { matchScope = 'local'; currentMatchLength = 6; }
+        // 正则匹配结尾的触发词，兼容带空格或不带空格两种输入习惯
+        const match = cleanText.match(/(?:^|\s)(#(?:cmdg|cmdl|cmd|kbg|kbl|kb))(\s)?$/);
 
-        if (matchScope) {
+        if (match) {
+            const trigger = match[1];
+            const hasSpace = !!match[2];
+            currentMatchLength = trigger.length + (hasSpace ? 1 : 0);
+
+            let matchScope = 'all';
+            if (trigger === '#cmdg') matchScope = 'global';
+            else if (trigger === '#cmdl') matchScope = 'local';
+            else if (trigger === '#cmd') matchScope = 'all'; // #cmd 默认载入全部指令和知识，体验最佳
+            else if (trigger === '#kbg') matchScope = 'global';
+            else if (trigger === '#kbl') matchScope = 'kb-local';
+            else if (trigger === '#kb') matchScope = 'kb-all';
+
             const projName = extractActiveProjectName();
+            const isPureLocal = (matchScope === 'local' || matchScope === 'kb-local');
             
-            if (matchScope === 'global' || projName) {
-                if (!dropdownContainer) showMenu(activeEl);
+            if (!isPureLocal || projName) {
+                showMenu(activeEl);
                 dropdownContainer.innerHTML = '<div class="p-3 text-xs opacity-50 text-center">Loading rules...</div>';
                 
-                rulesData = await fetchKnowledgeIndex(projName, matchScope);
+                rulesData = await fetchKnowledgeIndex(projName || '', matchScope);
                 renderRules(rulesData);
                 showMenu(activeEl);
             } else {
                 console.warn('[kb_trigger] 无法解析当前项目名称且当前作用域为 Local，无法获取本地知识库');
+                if (isMenuVisible) hideMenu();
             }
-        } else if (isMenuVisible && !cleanText.includes('#cmd')) {
-            hideMenu();
+        } else {
+            if (isMenuVisible) hideMenu();
         }
+    });
+
+    // 窗口尺寸变化时自动关闭或重新校准
+    window.addEventListener('resize', () => {
+        if (isMenuVisible) hideMenu();
     });
 
     // 点击其他地方隐藏

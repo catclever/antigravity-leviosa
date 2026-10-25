@@ -47,10 +47,19 @@ module.exports = async function(query) {
         const randomImage = allImages[Math.floor(Math.random() * allImages.length)];
         log(`Selected random image: ${randomImage}`);
 
+        // Clear old cache files
+        const webDir = path.join(__dirname, '../web');
+        const webFiles = fs.readdirSync(webDir);
+        for (const f of webFiles) {
+            if (f.startsWith('bg_cache.')) {
+                try { fs.unlinkSync(path.join(webDir, f)); } catch (e) {}
+            }
+        }
+
         // Copy file to web directory so Taichi's file server can serve it directly
         const extWithDot = path.extname(randomImage).toLowerCase();
         const cacheFilename = 'bg_cache' + extWithDot;
-        const targetPath = path.join(__dirname, '../web', cacheFilename);
+        const targetPath = path.join(webDir, cacheFilename);
         
         fs.copyFileSync(randomImage, targetPath);
 
