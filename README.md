@@ -85,7 +85,12 @@ This extension is designed to work seamlessly with my local **Taichi** service (
 1. Clone and start the Taichi service: [https://github.com/catclever/taichi](https://github.com/catclever/taichi)
 2. Since you've already cloned this repository directly into Taichi's `apps` directory in Step 1, no further file copying is needed.
 3. Once Taichi is running locally, it automatically hosts these files and exposes the required endpoint at `http://127.0.0.1:9216`.
-4. **Automatic Injection (No Step 3 needed!):** Taichi features built-in automated script injection. When Taichi is running alongside Antigravity, it automatically injects `web/main.js` into the dashboard runtime—meaning **you can completely skip Step 3**!
+4. **Automatic Cyber Injection (Skip Step 3!):** Taichi comes with the **`tai`** interactive CLI launcher. Instead of manually running snippets, launch Antigravity with cyber injection mode via your terminal:
+   ```bash
+   tai cyber antigravity
+   ```
+   *(Or simply run `tai` and select `⚡️ Cyber` -> `Antigravity` via the interactive fuzzy finder).*
+   Taichi automatically attaches and injects `web/main.js` into the dashboard runtime—**meaning you can completely skip Step 3!**
 
 #### Method 2: The DIY Mock Server
 If you don't want to pull the entire Taichi repo, no worries! You can easily spin up a tiny local mock server using Node.js to satisfy the API requirements. 
@@ -96,7 +101,7 @@ We have prepared a quick-start guide. Click the link below for the full scripts:
 Whichever method you choose, ensure the service is running before proceeding to the final step (if using DIY Mock Server).
 
 ### Step 3: Configure Antigravity (DIY Mock Server Only)
-> 💡 **Notice:** If you use **Taichi (Method 1)**, Taichi automatically handles the injection lifecycle for you—**you can completely skip this step!** This step is only required if you are using the DIY mock server or manual snippet execution.
+> 💡 **Notice:** If you use **Taichi (Method 1)** with `tai cyber antigravity`, Taichi automatically handles the injection lifecycle for you—**you can completely skip this step!** This step is only required if you are using the DIY mock server or manual snippet execution.
 
 Finally, you need to tell the Antigravity dashboard to load these custom scripts:
 
@@ -112,8 +117,8 @@ Finally, you need to tell the Antigravity dashboard to load these custom scripts
 
 ## Important Notes 注意事项
 
-- **Re-injection Required (DIY Mode):** When manually injecting via Developer Tools, the snippet does not persist across app restarts. Every time you fully quit and reopen Antigravity, you need to re-run the snippet (Step 3). With **Taichi**, injection is handled automatically in the background on every launch.<br>
-  **每次重启需重新注入（DIY模式）**：通过开发者工具手动注入的功能不会在应用重启后驻留。每次完全退出并重新打开 Antigravity 后，都需要重新运行一次 Snippet（即重复第三步）。如果使用 **Taichi**，则会在启动时自动完成后台注入，无需手动干预。
+- **Re-injection Required (DIY Mode):** When manually injecting via Developer Tools, the snippet does not persist across app restarts. Every time you fully quit and reopen Antigravity, you need to re-run the snippet (Step 3). With **Taichi**, simply launch via `tai cyber antigravity` and injection is handled automatically in the background.<br>
+  **每次重启需重新注入（DIY模式）**：通过开发者工具手动注入的功能不会在应用重启后驻留。每次完全退出并重新打开 Antigravity 后，都需要重新运行一次 Snippet（即重复第三步）。如果使用 **Taichi**，直接使用 `tai cyber antigravity` 唤醒即可自动在后台完成注入，无需手动干预。
 - **Google "Moves Fast and Breaks Things":** Antigravity is an actively updated product. Future updates to their dashboard's DOM structure or React components might cause some of these features to temporarily or permanently break. (Honestly, I hope Google just natively integrates these features soon so we don't have to keep injecting scripts...)<br>
   **速生速死**：Antigravity 是一个在积极更新的产品。如果未来 DOM 结构或者 React 组件发生重大变动，可能会导致某些功能暂时或者永久失效。（早用早享受哦~）
 

@@ -20,7 +20,12 @@
 1. 克隆或下载 Taichi 服务：[https://github.com/catclever/taichi](https://github.com/catclever/taichi)
 2. 因为你在第一步中已经直接把仓库克隆到了 Taichi 的 `apps` 目录下，所以现在不需要再做额外的文件复制工作了。
 3. 只要 Taichi 在本地运行，它就会自动托管这些文件，并在 `http://127.0.0.1:9216` 暴露所需的端点。
-4. **全自动注入（无需执行第三步！）：** Taichi 内置了全自动运行时脚本注入机制。当 Taichi 与 Antigravity 同时启动时，Taichi 会自动将 `web/main.js` 注入到面板中——**这意味着你可以直接跳过第三步！**
+4. **Cyber 自动化启动与注入（直接跳过第三步！）：** Taichi 提供了命令行交互式启动器 **`tai`**。无需手动开启开发者工具运行 Snippet，只需在终端中通过 Cyber 模式启动 Antigravity 即可：
+   ```bash
+   tai cyber antigravity
+   ```
+   *（或者直接输入 `tai`，在弹出的 fzf 交互面板中选择 `⚡️ Cyber` -> `Antigravity` 启动）。*
+   Taichi 会在应用启动时自动挂载并完成 `web/main.js` 的后台静默注入——**这意味着你可以完全跳过第三步！**
 
 #### 方法 2：DIY Mock 服务器
 如果你不想下载整个 Taichi 仓库，完全没问题！你可以用 Node.js 轻松搭建一个本地的微型 Mock 服务器来满足 API 需求。
@@ -31,7 +36,7 @@
 无论你选择哪种方法，在进入最后一步之前，请确保该服务正在运行（若使用 DIY Mock 服务器）。
 
 ### 第三步：配置 Antigravity（仅限 DIY Mock 服务器）
-> 💡 **提示：** 如果你使用的是 **Taichi（方法一）**，Taichi 会自动接管全自动注入生命周期，**你可以完全跳过本步骤！** 仅当你使用自建 Mock 服务器或手动 Snippet 执行时才需要此步骤。
+> 💡 **提示：** 如果你使用的是 **Taichi（方法一）** 并通过 `tai cyber antigravity` 启动，Taichi 会自动接管全自动注入生命周期，**你可以完全跳过本步骤！** 仅当你使用自建 Mock 服务器或手动 Snippet 执行时才需要此步骤。
 
 最后，你需要让 Antigravity 去加载这些自定义脚本。
 
