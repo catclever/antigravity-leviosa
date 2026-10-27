@@ -48,13 +48,33 @@ function ensureEditorStyles() {
     const style = document.createElement('style');
     style.id = styleId;
     style.textContent = `
-        /* 根容器隔离滤镜与背景，杜绝任何外部模糊或遮罩穿透 */
+        /* 根容器：视口切片全景背景映射 + 高度磨砂毛玻璃质感 (高不透明度保证代码高对比度与纯净背景) */
         #ag-inline-file-editor {
-            backdrop-filter: none !important;
-            -webkit-backdrop-filter: none !important;
-            filter: none !important;
+            background-image:
+                linear-gradient(rgba(11, 14, 20, 0.88), rgba(11, 14, 20, 0.92)),
+                var(--antigravity-bg, none) !important;
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+            background-attachment: fixed !important;
+            backdrop-filter: blur(28px) saturate(140%) !important;
+            -webkit-backdrop-filter: blur(28px) saturate(140%) !important;
             mask: none !important;
             -webkit-mask: none !important;
+        }
+
+        #ag-inline-file-editor #ag-editor-toolbar {
+            background: rgba(21, 25, 33, 0.55) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        }
+
+        #ag-inline-file-editor #ag-editor-body {
+            background: transparent !important;
+        }
+
+        #ag-inline-file-editor #ag-editor-statusbar {
+            background: rgba(8, 10, 15, 0.65) !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
         }
 
         #ag-inline-file-editor #ag-editor-code-container {
@@ -144,6 +164,8 @@ function ensureEditorStyles() {
 
         /* 行号条必须严格 pre，杜绝数字折行变成一行多字 */
         #ag-inline-file-editor #ag-editor-gutter {
+            background: rgba(8, 10, 15, 0.45) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
             white-space: pre !important;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
             font-size: 12px !important;
@@ -801,7 +823,7 @@ function mountInlineEditor(panelInfo, initialContent) {
     wrapper.style.zIndex = '9999999';
     wrapper.style.display = 'flex';
     wrapper.style.flexDirection = 'column';
-    wrapper.style.backgroundColor = '#0F1218';
+    wrapper.style.backgroundColor = 'transparent';
     wrapper.style.color = '#F1F5F9';
     wrapper.style.boxSizing = 'border-box';
     wrapper.style.boxShadow = '0 12px 48px rgba(0, 0, 0, 0.7)';
@@ -830,14 +852,13 @@ function mountInlineEditor(panelInfo, initialContent) {
     // 7.1 极简轻量顶栏 (绝不拥挤，按钮纯图标化)
     // ==========================================
     const toolbar = document.createElement('div');
+    toolbar.id = 'ag-editor-toolbar';
     toolbar.style.height = '36px';
     toolbar.style.flexShrink = '0';
     toolbar.style.display = 'flex';
     toolbar.style.alignItems = 'center';
     toolbar.style.justifyContent = 'space-between';
     toolbar.style.padding = '0 10px';
-    toolbar.style.borderBottom = '1px solid rgba(255, 255, 255, 0.08)';
-    toolbar.style.backgroundColor = '#151921';
     toolbar.style.userSelect = 'none';
 
     // 左侧：文件图标与文件名
@@ -994,12 +1015,13 @@ function mountInlineEditor(panelInfo, initialContent) {
     // 7.2 主体编辑区域 (行号 + 双层同轴绝对对齐)
     // ==========================================
     const editorBody = document.createElement('div');
+    editorBody.id = 'ag-editor-body';
     editorBody.style.flex = '1 1 0%';
     editorBody.style.minHeight = '0';
     editorBody.style.display = 'flex';
     editorBody.style.position = 'relative';
     editorBody.style.overflow = 'hidden';
-    editorBody.style.backgroundColor = '#0B0E14';
+    editorBody.style.backgroundColor = 'transparent';
 
     // 智能弹性宽度的行号条 (确保 white-space: pre !important 绝不换行)
     const lineGutter = document.createElement('div');
@@ -1008,8 +1030,7 @@ function mountInlineEditor(panelInfo, initialContent) {
     lineGutter.style.flexShrink = '0';
     lineGutter.style.textAlign = 'right';
     lineGutter.style.color = '#475569';
-    lineGutter.style.backgroundColor = '#080A0F';
-    lineGutter.style.borderRight = '1px solid rgba(255, 255, 255, 0.06)';
+    lineGutter.style.backgroundColor = 'transparent';
 
     // 清除原生双击可能残留的文档选区高亮
     try {
@@ -1081,14 +1102,14 @@ function mountInlineEditor(panelInfo, initialContent) {
     // 7.3 专属独立底栏状态条 (字数统计单独一行)
     // ==========================================
     const statusBar = document.createElement('div');
+    statusBar.id = 'ag-editor-statusbar';
     statusBar.style.height = '24px';
     statusBar.style.flexShrink = '0';
     statusBar.style.display = 'flex';
     statusBar.style.alignItems = 'center';
     statusBar.style.justifyContent = 'space-between';
     statusBar.style.padding = '0 12px';
-    statusBar.style.borderTop = '1px solid rgba(255, 255, 255, 0.08)';
-    statusBar.style.backgroundColor = '#080A0F';
+    statusBar.style.backgroundColor = 'transparent';
     statusBar.style.color = '#64748B';
     statusBar.style.fontSize = '11px';
     statusBar.style.userSelect = 'none';
