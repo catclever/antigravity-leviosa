@@ -40,6 +40,9 @@
 - 📦 **Deep & Shallow Archive Tool**: Intelligently cleans up and compresses old agent logs (both shallow and deep) for absolute OCD relief.<br>
   📦 **深/浅度归档工具**：智能清理并压缩旧的 Agent 日志，提供深浅双模式，绝对的强迫症福音。
 
+- ✏️ **In-Place File Editor**: Google lets you view files in the right panel, but editing them? "Please install an IDE." Double-click any file preview to edit in-place with crystal-clear syntax highlighting and `⌘S` auto-save. Isn't this supposed to be an AI workspace?<br>
+  ✏️ **原地双击编辑**：右侧抽屉只许看不许改是几个意思？改个错字还得专门唤醒外部 IDE。双击直接原地进入高亮编辑，`⌘S` 秒级存盘刷新，这才是正经工作台嘛！
+
 ## Background
 
 Google decided to bless us with a whole bunch of updates on May 20th:
@@ -195,6 +198,13 @@ Provides seamless multi-account profile management and hot-switching without rep
 - **Dual UI Entry Points:** Injects `Select Saved Account` and `Login via Refresh Token` buttons directly onto the welcome/login screen, plus compact icon buttons (**Switch Account** and **Add Account `+`**) next to the `Sign Out` button in `Settings -> Account`.
 - **Profile Archiving & Hot-Swap:** Archives account credentials and metadata in `~/.gemini/.accounts/`. Switching accounts automatically updates `state.vscdb`, macOS Keychain entries, and standalone OAuth tokens on the fly, with built-in support for importing or refreshing accounts via Refresh Tokens (RT).
 - **External Configuration:** OAuth client credentials are kept strictly out of git. Simply run `python3 scripts/extract_oauth_clients.py` to auto-extract them, or create `oauth_clients.json` following `oauth_clients.example.json`.
+
+### 16. `file_editor.js` & `antigravity_file_api.js` (In-Place File Editor)
+Turns Antigravity's read-only file preview drawer into a fully functional in-place code editor with zero external IDE dependencies.
+- **Trigger & Hotkeys:** Double-click anywhere in the file preview content to enter edit mode. Press `⌘S` (macOS) / `Ctrl + S` to save directly to disk via atomic Worker API calls and refresh the native view; press `Esc` to exit without changes.
+- **Ultra-Clear Highlighting & Alignment:** Uses an inverted z-index dual-layer architecture with a top-most `<pre>` layer (`pointer-events: none`) over an input `<textarea>`, eliminating subpixel font antialiasing haze. Out of the box support for JS/TS, Python, JSON, Markdown, HTML, CSS, Shell, and YAML.
+- **IDE Gutter & Single-Line Scroll:** Gutter line numbers strictly adhere to `white-space: pre` to prevent number-wrapping collapses. Code defaults to single-line horizontal scroll (`nowrap`) ensuring exact 1-to-1 line number alignment, with a toggleable wrap switch in the status bar.
+- **De-cluttered Chrome:** Pure SVG icon action buttons (Save 💾, Exit ✕, Format ✨) with hover tooltips, plus a dedicated bottom status bar displaying `Line/Col`, character count, total lines, encoding, and language mode.
 
 > **Note**: The `sidebar_reorder.js` feature (which previously folded pinned conversations) has been retired and removed from the default load, as the Antigravity dashboard has officially added native support for this! 🎉
 

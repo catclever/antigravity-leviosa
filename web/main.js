@@ -12,6 +12,7 @@ import { initOpenPathInFinder } from './open_path_in_finder.js';
 import { initPanelInject } from './panel_inject.js';
 import { initHistoryView } from './history_view.js';
 import { initAccountLoginInject } from './account_login_inject.js';
+import { initFileEditor } from './file_editor.js';
 
 console.log('🚀 [Antigravity Mod] 正在加载模块化组件...');
 
@@ -36,6 +37,9 @@ if (window === window.top) {
 
     // 新增欢迎/登录界面多账号管理与切换注入
     initAccountLoginInject();
+
+    // 新增文件预览面板本地文件双击原地编辑 (Cmd+S / Esc)
+    initFileEditor();
 
     console.log('✅ [Antigravity Mod] 所有模块加载完毕！');
 } else {

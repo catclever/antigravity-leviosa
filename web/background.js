@@ -86,14 +86,58 @@ export function initBackground() {
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
             }
 
-            /* 特殊处理：移除设置面板左侧导航项及其包装器被误伤注入的挤压背景图 */
+            /* 特殊处理：移除设置面板左侧导航项按钮多余背景图 */
             #root div:has(> button[data-testid^="settings-nav-item-"]),
-            #root div:has(> button[data-testid^="settings-nav-item-"]) *,
-            #root button[data-testid^="settings-nav-item-"],
-            #root [class*="border-sidebar-border"]:not(aside):not(sidebar) {
+            #root button[data-testid^="settings-nav-item-"] {
                 background-image: none !important;
-                backdrop-filter: none !important;
+            }
+            #root button[data-testid^="settings-nav-item-"]:not(.bg-sidebar-secondary):not(:hover) {
                 background-color: transparent !important;
+            }
+            #root button[data-testid^="settings-nav-item-"] * {
+                background-image: none !important;
+            }
+
+            /* 方案 B：设置面板外层卡片容器 - 视口全景切片映射 (1:1 绝对同轴比例，不缩放，杜绝跳跃) */
+            .leviosa-settings-dialog-card,
+            #root div:has(> div[style*="container-type: size"] button[data-testid^="settings-nav-item-"]),
+            #root [role="dialog"]:has(button[data-testid^="settings-nav-item-"]),
+            #root div[style*="container-type: size"]:has(button[data-testid^="settings-nav-item-"]) {
+                background-image: var(--antigravity-bg) !important;
+                background-size: var(--settings-bg-size, 100vw 100vh) !important;
+                background-position: var(--settings-bg-pos, center center) !important;
+                background-repeat: no-repeat !important;
+                background-attachment: scroll !important;
+                overflow: hidden !important;
+                animation: none !important;
+                transition: background-position 0s, background-size 0s !important;
+            }
+
+            /* 设置面板内部 200px 导航容器包装层透明化 */
+            #root div[style*="container-type: size"]:has(button[data-testid^="settings-nav-item-"]) div[style*="width: 200px"],
+            #root div[style*="container-type: size"]:has(button[data-testid^="settings-nav-item-"]) div[style*="width: 200px"] > div {
+                background-color: transparent !important;
+                background-image: none !important;
+            }
+
+            /* 特殊处理：设置面板左侧导航保持原汁原味的侧边栏独立透明度遮罩与毛玻璃质感 (75% + blur(2px)) */
+            #root div[style*="container-type: size"] .bg-sidebar:has(button[data-testid^="settings-nav-item-"]),
+            #root .bg-sidebar:has(button[data-testid^="settings-nav-item-"]) {
+                background-image:
+                    linear-gradient(${tintColor}, ${tintColor}),
+                    linear-gradient(135deg, transparent 0%, rgba(0, 0, 0, 0.05) 40%) !important;
+                background-color: transparent !important;
+                backdrop-filter: blur(2px) !important;
+                -webkit-backdrop-filter: blur(2px) !important;
+                box-shadow: inset 1px 0 0 0 rgba(255, 255, 255, 0.05) !important;
+                border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+            }
+
+            /* 特殊处理：设置面板右侧主内容区保持标准毛玻璃质感 (65% + blur(12px)) */
+            #root div[style*="container-type: size"]:has(button[data-testid^="settings-nav-item-"]) > div:not([style*="width: 200px"]) {
+                background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 65%, transparent) !important;
+                backdrop-filter: blur(12px) !important;
+                -webkit-backdrop-filter: blur(12px) !important;
             }
 
             /* === 3. 基础毛玻璃层 (完美继承 V4.2 右侧的神仙质感) === */
@@ -180,6 +224,54 @@ export function initBackground() {
                 backdrop-filter: none !important;
             }
 
+            /* === 4.3 彻底消灭对话流底部黑色渐变淡出遮罩与脏阴影边 (Bottom Fade Mask & Shadow Strip) === */
+            /* 1. 原生 Tailwind 渐变遮罩 (用于长对话滚入底部输入框时的淡出，原生为黑色 from-background) */
+            [data-testid="conversation-view"] [class*="bg-gradient-to-t"],
+            [data-testid="conversation-view"] [class*="bg-gradient-to-b"],
+            [data-testid="conversation-view"] [class*="from-background"],
+            [data-testid="conversation-view"] [class*="to-background"],
+            [data-testid="conversation-view"] [class*="via-background"],
+            [data-testid="autoscroll-viewport"] [class*="from-background"],
+            [data-testid="autoscroll-viewport"] [class*="to-background"],
+            [data-testid="autoscroll-viewport"] [class*="bg-gradient"],
+            div:has(> [data-testid="autoscroll-viewport"]) > [class*="gradient"],
+            div:has(> [data-testid="autoscroll-viewport"]) > [class*="from-background"],
+            div:has(> [data-testid="autoscroll-viewport"]) [class*="pointer-events-none"][class*="bottom-0"] {
+                background: transparent !important;
+                background-color: transparent !important;
+                background-image: none !important;
+                box-shadow: none !important;
+                border-color: transparent !important;
+            }
+
+            /* 2. 伪元素渐变消杀 (::before, ::after) */
+            [data-testid="conversation-view"] [class*="after:from-background"]::after,
+            [data-testid="conversation-view"] [class*="before:from-background"]::before,
+            [data-testid="conversation-view"] [class*="after:bg-gradient"]::after,
+            [data-testid="conversation-view"] [class*="before:bg-gradient"]::before,
+            [data-testid="autoscroll-viewport"]::after,
+            [data-testid="autoscroll-viewport"]::before,
+            div:has(> [data-testid="autoscroll-viewport"])::after,
+            div:has(> [data-testid="autoscroll-viewport"])::before {
+                display: none !important;
+                background: transparent !important;
+                background-image: none !important;
+            }
+
+            /* 3. 底部输入框/衔接区域的阴影、深色上边框与哨兵线消杀 */
+            [data-testid="conversation-view"] div:has(> textarea),
+            [data-testid="conversation-view"] div:has(> form),
+            [data-testid="autoscroll-viewport"] ~ div,
+            [data-testid="autoscroll-viewport"] + div {
+                box-shadow: none !important;
+            }
+
+            [data-testid="autoscroll-viewport"] div.h-px,
+            [data-testid="conversation-view"] div.h-px[aria-hidden="true"] {
+                background-color: transparent !important;
+                border-color: transparent !important;
+            }
+
             /* === 5. 消息气泡 & 交互小卡片浮雕化 === */
             /* 作为悬浮卡片，允许独立存在一层轻微毛玻璃 */
             .bg-card, .bg-secondary, .bg-card-border {
@@ -225,14 +317,15 @@ export function initBackground() {
     // 3. 注入 CSS
     // ============================================
     const styleId = "user-custom-theme-combined";
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement("style");
+    let style = document.getElementById(styleId);
+    if (!style) {
+      style = document.createElement("style");
       style.id = styleId;
       style.type = "text/css";
-      style.textContent = css;
       (document.head || document.documentElement).appendChild(style);
-      console.log("🎨 [Antigravity V4.4 反套娃版] 样式已注入！");
     }
+    style.textContent = css;
+    console.log("🎨 [Antigravity V4.4 反套娃版] 样式已注入！");
 
       // ============================================
       // 动态获取本地随机背景图
@@ -288,4 +381,117 @@ export function initBackground() {
       if (extractAndSetThemeColor()) clearInterval(interval);
       else if (++attempts > 50) clearInterval(interval);
     }, 200);
+
+    // ============================================
+    // 5. 设置面板方案 B：取景框数学切片映射管理器 (1:1 视口同轴无缩放)
+    // ============================================
+    let bgNaturalWidth = 0;
+    let bgNaturalHeight = 0;
+    const bgProbeImg = new Image();
+    bgProbeImg.onload = () => {
+        bgNaturalWidth = bgProbeImg.naturalWidth;
+        bgNaturalHeight = bgProbeImg.naturalHeight;
+        updateSettingsWindowSlice();
+    };
+    function probeBgImage() {
+        const stored = localStorage.getItem("antigravity_custom_bg_url");
+        if (stored && bgProbeImg.src !== stored) {
+            bgProbeImg.src = stored;
+        }
+    }
+    probeBgImage();
+
+    function updateSettingsWindowSlice() {
+        const settingsNavBtn = document.querySelector('button[data-testid^="settings-nav-item-"]');
+        if (!settingsNavBtn) return;
+
+        const target = settingsNavBtn.closest('div[style*="container-type: size"]')
+                    || settingsNavBtn.closest('.leviosa-settings-dialog-card');
+        if (!target) return;
+
+        const rect = target.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+
+        // 利用几何中心不变性 (Invariant Center)，在入场动画缩放 (如 scale 0.95 -> 1.0) 期间直接锁定真实静止坐标，杜绝坐标跳动
+        const layoutW = (target.offsetWidth && target.offsetWidth > 100) ? target.offsetWidth : rect.width;
+        const layoutH = (target.offsetHeight && target.offsetHeight > 100) ? target.offsetHeight : rect.height;
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const restingLeft = Math.round(centerX - layoutW / 2);
+        const restingTop = Math.round(centerY - layoutH / 2);
+
+        const W = window.innerWidth;
+        const H = window.innerHeight;
+
+        let renderW = W;
+        let renderH = H;
+        let originX = 0;
+        let originY = 0;
+
+        if (bgNaturalWidth > 0 && bgNaturalHeight > 0) {
+            const aspectWin = W / H;
+            const aspectImg = bgNaturalWidth / bgNaturalHeight;
+            if (aspectWin > aspectImg) {
+                renderW = W;
+                renderH = W / aspectImg;
+                originX = 0;
+                originY = (H - renderH) / 2;
+            } else {
+                renderW = H * aspectImg;
+                renderH = H;
+                originX = (W - renderW) / 2;
+                originY = 0;
+            }
+        }
+
+        const posX = Math.round(originX - restingLeft);
+        const posY = Math.round(originY - restingTop);
+
+        document.documentElement.style.setProperty('--settings-bg-size', `${Math.round(renderW)}px ${Math.round(renderH)}px`);
+        document.documentElement.style.setProperty('--settings-bg-pos', `${posX}px ${posY}px`);
+    }
+
+    function syncSettingsBackground() {
+        const settingsNavBtn = document.querySelector('button[data-testid^="settings-nav-item-"]');
+        if (!settingsNavBtn) {
+            const existingBg = document.getElementById('leviosa-settings-panel-bg');
+            if (existingBg) existingBg.remove();
+            const oldSidebarBg = document.getElementById('leviosa-settings-sidebar-bg');
+            if (oldSidebarBg) oldSidebarBg.remove();
+            return;
+        }
+
+        probeBgImage();
+
+        // 彻底清除旧的独立插入背景节点
+        const existingBg = document.getElementById('leviosa-settings-panel-bg');
+        if (existingBg) existingBg.remove();
+        const oldSidebarBg = document.getElementById('leviosa-settings-sidebar-bg');
+        if (oldSidebarBg) oldSidebarBg.remove();
+
+        // 寻找设置面板最外层卡片容器并赋予切片映射 class
+        const container = settingsNavBtn.closest('div[style*="container-type: size"]')?.parentElement
+                       || settingsNavBtn.closest('[role="dialog"]')
+                       || settingsNavBtn.closest('.flex-1.min-h-0.w-full.relative');
+        if (container && !container.classList.contains('leviosa-settings-dialog-card')) {
+            container.classList.add('leviosa-settings-dialog-card');
+        }
+
+        // 首次立即同步静止计算坐标，并跟进单次 rAF 保证布局就绪，移除引发多段跳跃的延时计时器
+        updateSettingsWindowSlice();
+        requestAnimationFrame(updateSettingsWindowSlice);
+    }
+
+    // 监听 DOM 树挂载与卸载，实现纯粹的生命周期同步
+    const settingsObserver = new MutationObserver(() => {
+        syncSettingsBackground();
+    });
+    settingsObserver.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+
+    window.addEventListener('resize', () => {
+        syncSettingsBackground();
+    });
 }
