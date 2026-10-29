@@ -26,6 +26,29 @@ const FORBIDDEN_EXTENSIONS = new Set([
     '.woff', '.woff2', '.ttf', '.eot', '.otf'
 ]);
 
+// 允许原地编辑的合法代码、配置与文本文件白名单
+const ALLOWED_CODE_EXTENSIONS = new Set([
+    // Code & Scripting
+    '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs',
+    '.py', '.pyw', '.rb', '.go', '.rs', '.java', '.kt', '.kts',
+    '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.cs', '.php',
+    '.swift', '.sh', '.bash', '.zsh', '.fish', '.lua', '.r', '.jl',
+    '.pl', '.pm', '.sql', '.dart', '.scala', '.erl', '.ex', '.exs',
+    // Web & Markup
+    '.html', '.htm', '.css', '.scss', '.sass', '.less', '.svg',
+    '.vue', '.svelte', '.astro',
+    // Data & Config
+    '.json', '.jsonc', '.json5', '.yaml', '.yml', '.toml', '.xml',
+    '.ini', '.env', '.properties', '.conf', '.config',
+    // Docs & Text
+    '.md', '.markdown', '.txt', '.log', '.csv', '.tsv', '.diff', '.patch',
+    '.gitignore', '.dockerignore', '.editorconfig'
+]);
+
+const ALLOWED_SPECIAL_FILENAMES = new Set([
+    'dockerfile', 'makefile', 'gemfile', 'procfile', 'rakefile', 'cmakelists.txt'
+]);
+
 function getFileExt(filename) {
     if (!filename || typeof filename !== 'string') return '';
     const lastDot = filename.lastIndexOf('.');
@@ -613,13 +636,38 @@ function isCandidateFilePath(val) {
     if (val.length < 3 || val.length > 500) return false;
     if (val.includes('<') || val.includes('>') || val.includes('\n')) return false;
 
-    const ext = getFileExt(val);
-    if (!ext || FORBIDDEN_EXTENSIONS.has(ext)) return false;
+    // 过滤带有空格的普通句子（除非带有常见绝对路径前缀）
+    if (val.includes(' ') && !val.startsWith('/Users/') && !val.startsWith('/private/') && !val.startsWith('/Volumes/')) {
+        return false;
+    }
 
+    // 严厉排除形如 exa.language_server_pb.Plugin 的 Java/Protobuf 消息类名/包名（无斜杠且有多个点）
+    if (!val.includes('/') && (val.match(/\./g) || []).length > 1) {
+        return false;
+    }
+
+    const lastSlash = val.lastIndexOf('/');
+    const basename = (lastSlash === -1 ? val : val.substring(lastSlash + 1)).toLowerCase();
+    const ext = getFileExt(basename);
+
+    if (ALLOWED_SPECIAL_FILENAMES.has(basename)) {
+        return true;
+    }
+
+    if (!ext || !ALLOWED_CODE_EXTENSIONS.has(ext)) {
+        return false;
+    }
+
+    if (FORBIDDEN_EXTENSIONS.has(ext)) {
+        return false;
+    }
+
+    // 绝对路径特征
     if (val.startsWith('/Users/') || val.startsWith('/private/') || val.startsWith('/tmp/') || val.startsWith('/Volumes/') || val.startsWith('~/')) {
         return true;
     }
 
+    // 相对路径特征 (含有 / 且分段合法)
     if (val.includes('/') && !val.startsWith('http://') && !val.startsWith('https://')) {
         const segments = val.split('/');
         if (segments.length >= 2 && segments[segments.length - 1].includes('.')) {
@@ -627,6 +675,7 @@ function isCandidateFilePath(val) {
         }
     }
 
+    // 单个合法文件名 (具有合法白名单扩展名)
     if (/^[a-zA-Z0-9_.-]+\.[a-zA-Z0-9_-]+$/.test(val)) {
         return true;
     }
@@ -634,18 +683,23 @@ function isCandidateFilePath(val) {
     return false;
 }
 
+const PATH_PROP_KEYS = new Set([
+    'filepath', 'filepaths', 'path', 'uri', 'filename', 'fileuri',
+    'sourcepath', 'targetpath', 'abspath', 'localpath'
+]);
+
 function findAbsolutePathInFiber(el) {
     let current = el;
     let depth = 0;
-    while (current && depth < 12) {
+    while (current && depth < 8) {
         const fiberKey = Object.keys(current).find(k => k.startsWith('__reactFiber$'));
         if (fiberKey) {
             let fiber = current[fiberKey];
             let attempts = 0;
-            while (fiber && attempts < 25) {
+            while (fiber && attempts < 15) {
                 if (fiber.memoizedProps) {
                     let foundPath = null;
-                    function safeFind(obj, maxDepth = 4, currentDepth = 0, visited = new Set()) {
+                    function safeFind(obj, maxDepth = 3, currentDepth = 0, visited = new Set()) {
                         if (!obj || typeof obj !== 'object' || currentDepth > maxDepth || visited.has(obj) || foundPath) return;
                         visited.add(obj);
 
@@ -654,13 +708,14 @@ function findAbsolutePathInFiber(el) {
 
                         for (const key of keys) {
                             if (key.startsWith('__') || key === 'children' || key === 'parent' || key === 'owner' || key === 'store') continue;
+                            const lowerKey = key.toLowerCase();
+                            // 仅检查包含路径含义的属性字段名，彻底避免抓取类名/插件元数据！
+                            if (!PATH_PROP_KEYS.has(lowerKey)) continue;
+
                             const val = obj[key];
                             if (typeof val === 'string' && isCandidateFilePath(val)) {
                                 foundPath = val;
                                 return;
-                            }
-                            if (val && typeof val === 'object') {
-                                safeFind(val, maxDepth, currentDepth + 1, visited);
                             }
                         }
                     }
@@ -727,11 +782,22 @@ function extractPathFromElementOrChildren(el) {
 function detectPanelAndFilePath(targetElement) {
     if (!targetElement) return null;
 
+    // 核心区域防护锁：绝不在侧边栏、历史记录、对话聊天流、设置对话框或看板中触发！
+    if (targetElement.closest('aside, nav, .bg-sidebar, #leviosa-history-view, #leviosa-kanban-panel, [role="dialog"], [data-testid="conversation-view"], [data-testid="conversation-list"]')) {
+        return null;
+    }
+
     let curr = targetElement;
     while (curr && curr !== document.body && curr !== document.documentElement) {
+        // 如果向上回溯到了侧边栏或对话流容器，立即中止
+        if (curr.matches('aside, nav, .bg-sidebar, #leviosa-history-view, #leviosa-kanban-panel, [role="dialog"], [data-testid="conversation-view"], [data-testid="conversation-list"]')) {
+            return null;
+        }
+
         const rect = curr.getBoundingClientRect();
         
-        if (rect.width >= 200 && rect.height >= 200) {
+        // 文件预览面板必须在屏幕右侧区域（横坐标绝不会在左侧栏 x < 200 内）
+        if (rect.width >= 200 && rect.height >= 200 && rect.left >= 200) {
             const headerCandidate = curr.firstElementChild;
             if (headerCandidate && !headerCandidate.contains(targetElement)) {
                 const rawPath = extractPathFromElementOrChildren(headerCandidate);
@@ -1402,7 +1468,7 @@ export function initFileEditor() {
     console.log('⚡ [Antigravity Mod] 本地文件双击编辑组件 (Pro IDE Ultra版) 已启动');
 
     document.addEventListener('dblclick', async (e) => {
-        if (e.target.closest('input, textarea, button, a, [role="button"], #ag-inline-file-editor')) {
+        if (e.target.closest('input, textarea, button, a, [role="button"], #ag-inline-file-editor, aside, nav, .bg-sidebar, #leviosa-history-view, #leviosa-kanban-panel, [role="dialog"], [data-testid="conversation-view"], [data-testid="conversation-list"]')) {
             return;
         }
 
@@ -1468,11 +1534,17 @@ export function initFileEditor() {
 
         if (target.closest('button, a, input, textarea, #ag-inline-file-editor')) return;
 
+        // 核心屏障：左侧边栏、历史记录、看板或聊天对话区绝对不触发任何悬停探测
+        if (target.closest('aside, nav, .bg-sidebar, #leviosa-history-view, #leviosa-kanban-panel, [role="dialog"], [data-testid="conversation-view"], [data-testid="conversation-list"]')) return;
+
         const panelInfo = detectPanelAndFilePath(target);
         if (panelInfo && panelInfo.filePath) {
-            target.dataset.agEditorHintReady = 'true';
-            if (!target.title) {
-                target.title = `💡 双击可编辑本地文件: ${panelInfo.filePath.substring(panelInfo.filePath.lastIndexOf('/') + 1)} (⌘S 保存退出, Esc 退出)`;
+            // 确保光标切实位于该文件预览面板的内容区内部，绝不在外部卡片或标题上提示
+            if (panelInfo.contentContainer && panelInfo.contentContainer.contains(target)) {
+                target.dataset.agEditorHintReady = 'true';
+                if (!target.title) {
+                    target.title = `💡 双击可编辑本地文件: ${panelInfo.filePath.substring(panelInfo.filePath.lastIndexOf('/') + 1)} (⌘S 保存退出, Esc 退出)`;
+                }
             }
         }
     });
