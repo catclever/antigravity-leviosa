@@ -13,6 +13,7 @@
  */
 
 import { extractActiveProjectName } from './project_opener.js';
+import { openFileInFinderBackend } from './api.js';
 
 const API_BASE = 'http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_file_api';
 
@@ -683,6 +684,97 @@ function isCandidateFilePath(val) {
     return false;
 }
 
+// 提取路径中的行号（支持 :123:45, :123 或 #L123-L145, #L123）
+export function extractLineNumber(text) {
+    if (!text || typeof text !== 'string') return null;
+    const hashMatch = text.match(/#L(\d+)/i);
+    if (hashMatch) return parseInt(hashMatch[1], 10);
+    const colonMatch = text.match(/:(\d+)(?::\d+)?$/);
+    if (colonMatch) return parseInt(colonMatch[1], 10);
+    return null;
+}
+
+// 清洗选中文本中的修饰字符、包裹符号、Markdown 格式及行号
+export function cleanSelectedFilePath(raw) {
+    if (!raw || typeof raw !== 'string') return '';
+    let text = raw.trim();
+
+    // 1. 去除首尾常见的包裹符号：引号、反引号、括号、书名号、中括号等
+    text = text.replace(/^[`"'\(\[\{《「“‘]+|[`"'\)\]\}》」”’]+$/g, '').trim();
+
+    // 2. 如果包含 markdown 链接形如 [xxx](url)，提取 url
+    const mdMatch = text.match(/\[.*?\]\((.+?)\)/);
+    if (mdMatch) {
+        text = mdMatch[1].trim();
+    }
+
+    // 3. 去除 file:// 协议头
+    if (text.startsWith('file://')) {
+        text = text.replace(/^file:\/\//, '');
+    }
+
+    // 4. 去除末尾的行号锚点，如 #L123-L145, #L123, :123:45, :123
+    text = text.replace(/#L\d+(-L\d+)?$/i, '');
+    text = text.replace(/:\d+(:\d+)?$/, '');
+
+    // 5. 再次去除两端可能残留的空白或引号
+    text = text.replace(/^[`"'\s]+|[`"'\s]+$/g, '').trim();
+
+    return text;
+}
+
+// 多层级解析磁盘真实绝对路径 (支持绝对路径、用户家目录~、当前激活项目及公共工程路径)
+export async function resolveFilePathOnDisk(rawPath) {
+    if (!rawPath) return null;
+    let pathToCheck = rawPath.trim();
+
+    if (pathToCheck.startsWith('file://')) {
+        pathToCheck = pathToCheck.replace(/^file:\/\//, '');
+    }
+
+    // 1. 如果以 ~ 开头，后端 resolveHome 会自动展开
+    if (pathToCheck.startsWith('~/')) {
+        const stat = await checkFileStat(pathToCheck);
+        if (stat && stat.success && stat.isFile) {
+            return stat.path;
+        }
+    }
+
+    // 2. 如果本身就是绝对路径
+    if (pathToCheck.startsWith('/')) {
+        const stat = await checkFileStat(pathToCheck);
+        if (stat && stat.success && stat.isFile) {
+            return stat.path;
+        }
+    }
+
+    // 3. 如果是相对路径，优先在当前激活项目目录下寻找
+    const activeProject = extractActiveProjectName();
+    const candidates = [];
+    if (activeProject) {
+        candidates.push(`/Users/kael/Projects/${activeProject}/${pathToCheck}`);
+        candidates.push(`/Users/kael/Library/Services/taichi/apps/${activeProject}/${pathToCheck}`);
+    }
+    candidates.push(`/Users/kael/Projects/antigravity-leviosa/${pathToCheck}`);
+    candidates.push(`/Users/kael/Projects/${pathToCheck}`);
+    candidates.push(`/Users/kael/${pathToCheck}`);
+
+    for (const cand of candidates) {
+        const stat = await checkFileStat(cand);
+        if (stat && stat.success && stat.isFile) {
+            return stat.path;
+        }
+    }
+
+    // 4. 后端直接 fallback 校验
+    const fallbackStat = await checkFileStat(pathToCheck);
+    if (fallbackStat && fallbackStat.success && fallbackStat.isFile) {
+        return fallbackStat.path;
+    }
+
+    return null;
+}
+
 const PATH_PROP_KEYS = new Set([
     'filepath', 'filepaths', 'path', 'uri', 'filename', 'fileuri',
     'sourcepath', 'targetpath', 'abspath', 'localpath'
@@ -846,7 +938,7 @@ function detectPanelAndFilePath(targetElement) {
 // ==========================================
 // 7. 全新极简 Pro 编辑器实现
 // ==========================================
-function mountInlineEditor(panelInfo, initialContent) {
+function mountInlineEditor(panelInfo, initialContent, targetLine = null) {
     if (activeEditorInstance) {
         activeEditorInstance.destroy();
     }
@@ -897,19 +989,35 @@ function mountInlineEditor(panelInfo, initialContent) {
     wrapper.style.overflow = 'hidden';
 
     function syncBounds() {
-        if (!panel) return;
-        const panelRect = panel.getBoundingClientRect();
-        const headerRect = header ? header.getBoundingClientRect() : null;
+        if (panel) {
+            const panelRect = panel.getBoundingClientRect();
+            const headerRect = header ? header.getBoundingClientRect() : null;
 
-        const top = headerRect ? headerRect.bottom : panelRect.top;
-        const left = panelRect.left;
-        const width = panelRect.width;
-        const height = Math.max(150, panelRect.bottom - top);
+            const top = headerRect ? headerRect.bottom : panelRect.top;
+            const left = panelRect.left;
+            const width = panelRect.width;
+            const height = Math.max(150, panelRect.bottom - top);
 
-        wrapper.style.top = `${Math.round(top)}px`;
-        wrapper.style.left = `${Math.round(left)}px`;
-        wrapper.style.width = `${Math.round(width)}px`;
-        wrapper.style.height = `${Math.round(height)}px`;
+            wrapper.style.top = `${Math.round(top)}px`;
+            wrapper.style.left = `${Math.round(left)}px`;
+            wrapper.style.width = `${Math.round(width)}px`;
+            wrapper.style.height = `${Math.round(height)}px`;
+            wrapper.style.borderRadius = '0';
+        } else {
+            // 独立抽屉模式 (Drawer Mode)：右侧滑出 Pro 编辑器
+            const top = 38;
+            const width = Math.min(880, Math.max(560, Math.round(window.innerWidth * 0.48)));
+            const left = Math.round(window.innerWidth - width);
+            const height = Math.max(200, window.innerHeight - top);
+
+            wrapper.style.top = `${top}px`;
+            wrapper.style.left = `${left}px`;
+            wrapper.style.width = `${width}px`;
+            wrapper.style.height = `${height}px`;
+            wrapper.style.borderRadius = '12px 0 0 12px';
+            wrapper.style.borderLeft = '1px solid rgba(255, 255, 255, 0.16)';
+            wrapper.style.boxShadow = '-12px 0 40px rgba(0, 0, 0, 0.65)';
+        }
     }
 
     syncBounds();
@@ -1374,6 +1482,19 @@ function mountInlineEditor(panelInfo, initialContent) {
 
     requestAnimationFrame(() => {
         textarea.focus();
+        if (targetLine && targetLine > 0) {
+            const lines = textarea.value.split('\n');
+            let charPos = 0;
+            for (let i = 0; i < Math.min(targetLine - 1, lines.length); i++) {
+                charPos += lines[i].length + 1;
+            }
+            try {
+                textarea.setSelectionRange(charPos, charPos);
+                textarea.scrollTop = Math.max(0, (targetLine - 4) * 21);
+                syncScroll();
+                updateCursorPosition();
+            } catch (e) {}
+        }
     });
 
     let isSaving = false;
@@ -1464,8 +1585,234 @@ function mountInlineEditor(panelInfo, initialContent) {
 // ==========================================
 // 8. 全局双击事件与初始化
 // ==========================================
+// 8.1 外部/快捷调用的直接打开编辑器函数
+export async function openFileInEditor(targetPath, targetLine = null) {
+    if (!targetPath) return;
+
+    const baseName = targetPath.substring(targetPath.lastIndexOf('/') + 1);
+    showToast(`正在定位文件: ${baseName}...`, 'info', 800);
+
+    const resolvedPath = await resolveFilePathOnDisk(targetPath);
+    if (!resolvedPath) {
+        showToast(`⚠️ 本地未找到该文件: ${targetPath}`, 'error', 3000);
+        return;
+    }
+
+    const statRes = await checkFileStat(resolvedPath);
+    if (!statRes || !statRes.success || !statRes.isFile) {
+        showToast(`⚠️ 无法访问文件: ${resolvedPath}`, 'error', 3000);
+        return;
+    }
+
+    if (statRes.isBinary) {
+        showToast(`⚠️ 二进制文件不支持原地编辑: ${resolvedPath.substring(resolvedPath.lastIndexOf('.') || 0)}`, 'error', 3000);
+        return;
+    }
+
+    const fileData = await readFileFromBackend(resolvedPath);
+    if (!fileData || !fileData.success || typeof fileData.content !== 'string') {
+        showToast(`读取失败: ${fileData?.error || '无法读取文件内容'}`, 'error', 3000);
+        return;
+    }
+
+    // 寻找现有的预览面板 (如果用户已经打开了文件预览)
+    let panelInfo = null;
+    const existingPanels = Array.from(document.querySelectorAll('div'));
+    for (const el of existingPanels) {
+        if (el.closest('aside, nav, .bg-sidebar, #leviosa-history-view, #leviosa-kanban-panel, [role="dialog"], [data-testid="conversation-view"], [data-testid="conversation-list"]')) {
+            continue;
+        }
+        const rect = el.getBoundingClientRect();
+        if (rect.width >= 200 && rect.height >= 200 && rect.left >= 200) {
+            const headerCandidate = el.firstElementChild;
+            if (headerCandidate) {
+                panelInfo = {
+                    panel: el,
+                    contentContainer: el.lastElementChild || el,
+                    header: headerCandidate,
+                    filePath: resolvedPath,
+                    rawBtn: null,
+                    previewBtn: null
+                };
+                break;
+            }
+        }
+    }
+
+    if (!panelInfo) {
+        // 独立抽屉模式 (Drawer Mode)
+        panelInfo = {
+            panel: null,
+            contentContainer: null,
+            header: null,
+            filePath: resolvedPath,
+            rawBtn: null,
+            previewBtn: null
+        };
+    }
+
+    mountInlineEditor(panelInfo, fileData.content, targetLine);
+}
+
+// 8.2 对话选中文本「在编辑器中打开」注入模块
+let lastActiveSelectionPath = '';
+let lastActiveSelectionLine = null;
+
+function initSelectionEditorButton() {
+    console.log('⚡ [Antigravity Mod] 对话选中文档/代码快速编辑注入已启动');
+
+    function checkAndInjectButton() {
+        const quoteBtn = document.querySelector('button[data-testid="selection-quote-button"]');
+        if (!quoteBtn || !quoteBtn.parentElement) return;
+
+        const parentBar = quoteBtn.parentElement;
+
+        // 1. 获取当前用户选中的文字
+        const selection = window.getSelection();
+        let rawSelectedText = '';
+        let targetLine = null;
+        let candidatePath = '';
+
+        if (selection && !selection.isCollapsed) {
+            rawSelectedText = selection.toString();
+            targetLine = extractLineNumber(rawSelectedText);
+            candidatePath = cleanSelectedFilePath(rawSelectedText);
+
+            // 如果选中文本本身不是直接的路径，尝试看是否选中了带 href 的 a 标签
+            if (!isCandidateFilePath(candidatePath)) {
+                try {
+                    const anchorEl = selection.anchorNode?.parentElement?.closest('a[href]') || 
+                                     selection.focusNode?.parentElement?.closest('a[href]');
+                    if (anchorEl && anchorEl.href) {
+                        const href = decodeURIComponent(anchorEl.href);
+                        targetLine = targetLine || extractLineNumber(href);
+                        const cleanHref = cleanSelectedFilePath(href);
+                        if (isCandidateFilePath(cleanHref)) {
+                            candidatePath = cleanHref;
+                        }
+                    }
+                } catch (e) {}
+            }
+        }
+
+        const isValid = isCandidateFilePath(candidatePath);
+
+        let editorBtn = parentBar.querySelector('#ag-selection-editor-btn');
+        let divider = parentBar.querySelector('#ag-selection-editor-divider');
+
+        if (!isValid) {
+            // 如果当前选中的不是合法文件路径，保持原生 Quote 浮层纯净
+            if (editorBtn) editorBtn.remove();
+            if (divider) divider.remove();
+            return;
+        }
+
+        lastActiveSelectionPath = candidatePath;
+        lastActiveSelectionLine = targetLine;
+
+        // 若已存在，更新当前目标路径与行号
+        if (editorBtn) {
+            editorBtn.dataset.targetPath = candidatePath;
+            if (targetLine) editorBtn.dataset.targetLine = String(targetLine);
+            else delete editorBtn.dataset.targetLine;
+            return;
+        }
+
+        // 创建微型视觉分割线
+        divider = document.createElement('div');
+        divider.id = 'ag-selection-editor-divider';
+        divider.style.width = '1px';
+        divider.style.height = '14px';
+        divider.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+        divider.style.margin = '0 2px';
+        divider.style.flexShrink = '0';
+        divider.style.alignSelf = 'center';
+
+        // 创建「在编辑器中打开」按钮，100% 继承原生 Quote 按钮样式与 Tailwind 交互状态
+        editorBtn = document.createElement('button');
+        editorBtn.id = 'ag-selection-editor-btn';
+        editorBtn.dataset.testid = 'selection-open-editor-button';
+        editorBtn.dataset.targetPath = candidatePath;
+        if (targetLine) editorBtn.dataset.targetLine = String(targetLine);
+        editorBtn.className = 'flex items-center gap-1.5 justify-center px-2 py-1 transition-colors cursor-pointer hover:bg-secondary text-xs flex-1 min-w-0 rounded select-none';
+        editorBtn.title = '在内置编辑器中编辑本地文件 (⌘S 保存退出, Esc 退出; ⌥ 点击可在外部打开)';
+
+        const penIconSvg = `
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-80 shrink-0">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+            </svg>
+        `;
+
+        editorBtn.innerHTML = `
+            <span class="flex items-center justify-center">${penIconSvg}</span>
+            <span class="text-xs font-medium whitespace-nowrap">在编辑器中打开</span>
+        `;
+
+        // 关键防护：阻止 mousedown 导致浏览器的 selection 立即塌缩，确保 click 事件顺利执行
+        editorBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        editorBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const targetPath = editorBtn.dataset.targetPath || lastActiveSelectionPath;
+            const targetLineNum = editorBtn.dataset.targetLine ? parseInt(editorBtn.dataset.targetLine, 10) : lastActiveSelectionLine;
+            if (!targetPath) return;
+
+            // 快捷操作：若按住 Option/Alt 键，调用 Finder / 外部工具打开
+            if (e.altKey) {
+                openFileInFinderBackend('', '', targetPath);
+                return;
+            }
+
+            // 打开内置 Pro 编辑器
+            await openFileInEditor(targetPath, targetLineNum);
+        });
+
+        // 紧贴在 Quote 按钮右侧插入
+        if (quoteBtn.nextSibling) {
+            parentBar.insertBefore(divider, quoteBtn.nextSibling);
+            parentBar.insertBefore(editorBtn, divider.nextSibling);
+        } else {
+            parentBar.appendChild(divider);
+            parentBar.appendChild(editorBtn);
+        }
+    }
+
+    // 监听选取变化与鼠标释放
+    document.addEventListener('selectionchange', () => {
+        requestAnimationFrame(checkAndInjectButton);
+    });
+
+    document.addEventListener('mouseup', () => {
+        setTimeout(checkAndInjectButton, 30);
+    });
+
+    // MutationObserver 监听 Quote 浮动栏动态挂载
+    const observer = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+            if (m.addedNodes.length > 0) {
+                const quoteBtn = document.querySelector('button[data-testid="selection-quote-button"]');
+                if (quoteBtn) {
+                    checkAndInjectButton();
+                    break;
+                }
+            }
+        }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+}
+
 export function initFileEditor() {
     console.log('⚡ [Antigravity Mod] 本地文件双击编辑组件 (Pro IDE Ultra版) 已启动');
+
+    // 启动选中文本 Quote 浮层按钮注入
+    initSelectionEditorButton();
 
     document.addEventListener('dblclick', async (e) => {
         if (e.target.closest('input, textarea, button, a, [role="button"], #ag-inline-file-editor, aside, nav, .bg-sidebar, #leviosa-history-view, #leviosa-kanban-panel, [role="dialog"], [data-testid="conversation-view"], [data-testid="conversation-list"]')) {
@@ -1487,26 +1834,13 @@ export function initFileEditor() {
 
         const domContent = extractVisibleTextFromDOM(panelInfo.contentContainer);
 
-        let statRes = await checkFileStat(filePath);
-        
-        if ((!statRes || !statRes.success || !statRes.isFile) && !filePath.startsWith('/')) {
-            const activeProject = extractActiveProjectName();
-            if (activeProject) {
-                const candidates = [
-                    `/Users/kael/Projects/${activeProject}/${filePath}`,
-                    `/Users/kael/Library/Services/taichi/apps/${activeProject}/${filePath}`
-                ];
-                for (const cand of candidates) {
-                    const retryStat = await checkFileStat(cand);
-                    if (retryStat && retryStat.success && retryStat.isFile) {
-                        filePath = cand;
-                        panelInfo.filePath = cand;
-                        statRes = retryStat;
-                        break;
-                    }
-                }
-            }
+        const resolved = await resolveFilePathOnDisk(filePath);
+        if (resolved) {
+            filePath = resolved;
+            panelInfo.filePath = resolved;
         }
+
+        let statRes = await checkFileStat(filePath);
 
         let diskContent = '';
         if (statRes && statRes.success && statRes.isFile && !statRes.isBinary) {
