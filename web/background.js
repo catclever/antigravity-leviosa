@@ -133,9 +133,9 @@ export function initBackground() {
                 border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
             }
 
-            /* 特殊处理：设置面板右侧主内容区保持标准毛玻璃质感 (65% + blur(12px)) */
+            /* 特殊处理：设置面板右侧主内容区保持独立磨砂质感 (提高至 85% 增强文字阅读沉浸感 + blur(12px)) */
             #root div[style*="container-type: size"]:has(button[data-testid^="settings-nav-item-"]) > div:not([style*="width: 200px"]) {
-                background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 65%, transparent) !important;
+                background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 85%, transparent) !important;
                 backdrop-filter: blur(12px) !important;
                 -webkit-backdrop-filter: blur(12px) !important;
             }

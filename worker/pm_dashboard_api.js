@@ -34,11 +34,14 @@ module.exports = async function(query) {
         
         for (const file of files) {
             try {
-                const content = fs.readFileSync(path.join(tasksDir, file), 'utf-8');
+                const filePath = path.join(tasksDir, file);
+                const stat = fs.statSync(filePath);
+                const mtimeMs = stat.mtimeMs;
+                const content = fs.readFileSync(filePath, 'utf-8');
                 const parts = content.split('---');
                 if (parts.length >= 3) {
                     const frontmatterText = parts[1];
-                    let title = "Unknown", status = "backlog", priority = "low", tags = [];
+                    let title = "Unknown", status = "backlog", priority = "low", tags = [], completedAt = null;
                     
                     const lines = frontmatterText.split('\n');
                     let inTags = false;
@@ -56,6 +59,8 @@ module.exports = async function(query) {
                             status = line.substring(7).trim().toLowerCase();
                         } else if (line.startsWith('priority:')) {
                             priority = line.substring(9).trim().toLowerCase();
+                        } else if (line.startsWith('completed_at:')) {
+                            completedAt = line.substring(13).trim().replace(/^['"]|['"]$/g, '');
                         } else if (line.startsWith('tags:')) {
                             inTags = true;
                             let inlineTags = line.substring(5).trim().replace(/[\[\]]/g, '');
@@ -69,7 +74,18 @@ module.exports = async function(query) {
                     }
                     
                     const body = parts.slice(2).join('---').trim();
-                    tasks.push({ id: file, title, status, priority, tags, filePath: path.join(tasksDir, file), body });
+                    const parsedCompletedAt = completedAt ? (Date.parse(completedAt) || mtimeMs) : mtimeMs;
+                    tasks.push({ 
+                        id: file, 
+                        title, 
+                        status, 
+                        priority, 
+                        tags, 
+                        filePath, 
+                        body, 
+                        mtimeMs, 
+                        completedAt: parsedCompletedAt 
+                    });
                 }
             } catch (e) {
                 // Ignore parse errors
@@ -87,7 +103,12 @@ module.exports = async function(query) {
         if (fs.existsSync(taskPath)) {
             try {
                 let content = fs.readFileSync(taskPath, 'utf-8');
-                // 正则替换 status 字段为 completed
+                const nowIso = new Date().toISOString();
+                if (/^completed_at:\s*.*$/m.test(content)) {
+                    content = content.replace(/^completed_at:\s*.*$/m, `completed_at: ${nowIso}`);
+                } else {
+                    content = content.replace(/^status:\s*.*$/m, `status: completed\ncompleted_at: ${nowIso}`);
+                }
                 content = content.replace(/^status:\s*.*$/m, 'status: completed');
                 fs.writeFileSync(taskPath, content, 'utf-8');
                 return { success: true };

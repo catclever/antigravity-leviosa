@@ -375,6 +375,14 @@ export function initPanelInject() {
         const completed = tasks.filter(t => completedStates.includes(t.status));
         const active = tasks.filter(t => !backlogStates.includes(t.status) && !completedStates.includes(t.status));
 
+        // 已经完成的任务：按照完成时间倒序排列 (最新完成排在最前)
+        completed.sort((a, b) => {
+            const timeA = a.completedAt || a.mtimeMs || 0;
+            const timeB = b.completedAt || b.mtimeMs || 0;
+            if (timeA !== timeB) return timeB - timeA;
+            return String(b.id).localeCompare(String(a.id));
+        });
+
         function generateTaskCards(taskList, columnType) {
             if (taskList.length === 0) {
                 return `<div class="text-center py-6 text-xs text-muted-foreground/60 border border-dashed border-white/10 rounded-xl bg-white/[0.02]">Empty</div>`;
@@ -450,6 +458,25 @@ export function initPanelInject() {
                 const filePath = t.filePath || (tasksPath ? `${tasksPath}/${t.id}` : '');
                 const safeFilePath = filePath.replace(/'/g, "\\'");
 
+                let completionTimeHtml = '';
+                if (columnType === 'completed' && (t.completedAt || t.mtimeMs)) {
+                    const d = new Date(t.completedAt || t.mtimeMs);
+                    if (!isNaN(d.getTime())) {
+                        const now = new Date();
+                        const isToday = d.toDateString() === now.toDateString();
+                        const timeStr = isToday 
+                            ? `今天 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+                            : `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                        
+                        completionTimeHtml = `
+                            <span class="text-[9px] px-1.5 py-0.5 rounded text-muted-foreground/60 border border-white/5 bg-white/[0.02] ml-auto shrink-0 flex items-center gap-1 font-mono" title="完成时间: ${d.toLocaleString()}">
+                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-70"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                ${timeStr}
+                            </span>
+                        `;
+                    }
+                }
+
                 return `
                     <div onclick="window.leviosaOpenTask('${t.id}', '${safeFilePath}')"
                          class="${containerClass}"
@@ -466,7 +493,7 @@ export function initPanelInject() {
                             </div>
                         </div>
                         <h4 class="text-sm font-semibold mb-2 text-foreground/90 leading-tight">${t.title}</h4>
-                        <div class="flex gap-1 flex-wrap">${tagsHtml}</div>
+                        <div class="flex items-center gap-1 flex-wrap">${tagsHtml}${completionTimeHtml}</div>
                         ${actionBtn}
                         ${startBtn}
                     </div>`;
