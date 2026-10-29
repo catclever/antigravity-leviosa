@@ -105,7 +105,26 @@ module.exports = async function(query = {}) {
                     return { success: false, error: `File too large for inline edit (${Math.round(stat.size / 1024)}KB > 5MB)` };
                 }
 
-                const content = fs.readFileSync(filePath, 'utf-8');
+                const rawBuf = fs.readFileSync(filePath);
+                let content = '';
+
+                // 1. 兼容 UTF-8 带 BOM 文件 (0xEF, 0xBB, 0xBF)
+                if (rawBuf.length >= 3 && rawBuf[0] === 0xEF && rawBuf[1] === 0xBB && rawBuf[2] === 0xBF) {
+                    content = new TextDecoder('utf-8').decode(rawBuf.subarray(3));
+                } else {
+                    // 2. 严格尝试标准 UTF-8 解码
+                    try {
+                        content = new TextDecoder('utf-8', { fatal: true }).decode(rawBuf);
+                    } catch (e) {
+                        // 3. 中文 Windows/老旧系统常见 GBK / GB18030 自动降级解析
+                        try {
+                            content = new TextDecoder('gbk').decode(rawBuf);
+                        } catch (e2) {
+                            content = new TextDecoder('utf-8').decode(rawBuf);
+                        }
+                    }
+                }
+
                 return {
                     success: true,
                     path: filePath,
@@ -126,7 +145,9 @@ module.exports = async function(query = {}) {
 
             let content = '';
             if (typeof query.content_b64 === 'string') {
-                content = Buffer.from(query.content_b64, 'base64').toString('utf-8');
+                // 关键修复：URL query 中的 '+' 会被某些中间件或 querystring 解析为空格，必须还原恢复 Base64 字节流！
+                const cleanB64 = query.content_b64.replace(/ /g, '+');
+                content = Buffer.from(cleanB64, 'base64').toString('utf-8');
             } else if (typeof query.content === 'string') {
                 try {
                     content = decodeURIComponent(query.content);
@@ -163,18 +184,18 @@ module.exports = async function(query = {}) {
             const uploadId = query.upload_id;
             const index = parseInt(query.index, 10);
             const total = parseInt(query.total, 10);
-            let chunk = query.chunk || '';
 
             if (!uploadId || isNaN(index) || isNaN(total)) {
                 return { success: false, error: 'Invalid chunk parameters' };
             }
 
-            if (query.chunk_b64) {
-                chunk = Buffer.from(query.chunk_b64, 'base64').toString('utf-8');
-            } else {
-                try {
-                    chunk = decodeURIComponent(chunk);
-                } catch (e) {}
+            // 关键修复：分块收集原始 Base64 字符串（还原空格为加号），严禁单块提前解码成 UTF-8！
+            // 单块提前解码会导致跨分块边界的多字节中文字符（3字节）被截断破坏为乱码符号(U+FFFD)！
+            let chunkB64 = '';
+            if (typeof query.chunk_b64 === 'string') {
+                chunkB64 = query.chunk_b64.replace(/ /g, '+');
+            } else if (typeof query.chunk === 'string') {
+                chunkB64 = Buffer.from(decodeURIComponent(query.chunk), 'utf-8').toString('base64');
             }
 
             let session = CHUNK_SESSIONS.get(uploadId);
@@ -189,15 +210,17 @@ module.exports = async function(query = {}) {
                 CHUNK_SESSIONS.set(uploadId, session);
             }
 
-            if (!session.chunks[index]) {
-                session.chunks[index] = chunk;
+            if (session.chunks[index] === undefined) {
+                session.chunks[index] = chunkB64;
                 session.received++;
             }
             session.timestamp = Date.now();
 
             if (session.received >= session.total) {
                 CHUNK_SESSIONS.delete(uploadId);
-                const fullContent = session.chunks.join('');
+                // 完整拼装所有分块后再整体以 UTF-8 解码，确保多字节字符 100% 完整无损！
+                const fullBase64 = session.chunks.join('');
+                const fullContent = Buffer.from(fullBase64, 'base64').toString('utf-8');
                 try {
                     const parentDir = path.dirname(session.path);
                     if (!fs.existsSync(parentDir)) {

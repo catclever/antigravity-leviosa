@@ -126,7 +126,8 @@ function ensureEditorStyles() {
             background: transparent !important;
             background-color: transparent !important;
             box-sizing: border-box !important;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "PingFang SC", "Microsoft YaHei", monospace !important;
+            -webkit-font-smoothing: antialiased !important;
             font-size: 13px !important;
             line-height: 21px !important;
             letter-spacing: 0px !important;
@@ -168,7 +169,8 @@ function ensureEditorStyles() {
             background: transparent !important;
             background-color: transparent !important;
             box-sizing: border-box !important;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "PingFang SC", "Microsoft YaHei", monospace !important;
+            -webkit-font-smoothing: antialiased !important;
             font-size: 13px !important;
             line-height: 21px !important;
             letter-spacing: 0px !important;
@@ -191,7 +193,8 @@ function ensureEditorStyles() {
             background: rgba(8, 10, 15, 0.45) !important;
             border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
             white-space: pre !important;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "PingFang SC", "Microsoft YaHei", monospace !important;
+            -webkit-font-smoothing: antialiased !important;
             font-size: 12px !important;
             line-height: 21px !important;
             letter-spacing: 0px !important;
@@ -562,9 +565,23 @@ async function readFileFromBackend(filePath) {
     }
 }
 
+function stringToSafeBase64(str) {
+    try {
+        const bytes = new TextEncoder().encode(str);
+        let binString = '';
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i += 8192) {
+            binString += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + 8192, len)));
+        }
+        return btoa(binString);
+    } catch (e) {
+        return btoa(unescape(encodeURIComponent(str)));
+    }
+}
+
 async function writeFileToBackend(filePath, content) {
     try {
-        const b64 = btoa(unescape(encodeURIComponent(content)));
+        const b64 = stringToSafeBase64(content);
 
         if (b64.length < 3000) {
             const url = `${API_BASE}?action=write&path=${encodeURIComponent(filePath)}&content_b64=${encodeURIComponent(b64)}&nocache=1`;
@@ -1464,8 +1481,25 @@ function mountInlineEditor(panelInfo, initialContent, targetLine = null) {
         });
     }
 
-    textarea.addEventListener('input', () => {
+    let isComposing = false;
+    textarea.addEventListener('compositionstart', () => {
+        isComposing = true;
+        // 中文拼音/选词期间临时使文本可见，确保用户能清晰看清自己正在输入的拼音及输入法下划线
+        textarea.style.setProperty('-webkit-text-fill-color', '#e2e8f0', 'important');
+    });
+
+    textarea.addEventListener('compositionend', () => {
+        isComposing = false;
+        // 汉字上屏后恢复全透明，将显示无缝交还给顶层纯净语法高亮层
+        textarea.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
         updateHighlightAndStats();
+        updateCursorPosition();
+    });
+
+    textarea.addEventListener('input', () => {
+        if (!isComposing) {
+            updateHighlightAndStats();
+        }
         updateCursorPosition();
     });
 
