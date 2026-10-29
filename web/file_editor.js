@@ -635,11 +635,17 @@ function isCandidateFilePath(val) {
     if (!val || typeof val !== 'string') return false;
     val = val.trim();
     if (val.length < 3 || val.length > 500) return false;
-    if (val.includes('<') || val.includes('>') || val.includes('\n')) return false;
+    if (val.includes('<') || val.includes('>') || val.includes('\n') || val.includes('\r')) return false;
 
-    // 过滤带有空格的普通句子（除非带有常见绝对路径前缀）
-    if (val.includes(' ') && !val.startsWith('/Users/') && !val.startsWith('/private/') && !val.startsWith('/Volumes/')) {
-        return false;
+    // 排除明显的句子标点符号
+    if (/[,，?？!！;；]/.test(val)) return false;
+
+    // 如果带有空格：必须具备明确的路径特征 (包含 / 或以 ~/ 开头)，否则视为普通文本
+    if (val.includes(' ')) {
+        const isPathLike = val.startsWith('/') || val.startsWith('~/') || val.startsWith('./') || val.startsWith('../') || val.includes('/');
+        if (!isPathLike) {
+            return false;
+        }
     }
 
     // 严厉排除形如 exa.language_server_pb.Plugin 的 Java/Protobuf 消息类名/包名（无斜杠且有多个点）
@@ -663,8 +669,8 @@ function isCandidateFilePath(val) {
         return false;
     }
 
-    // 绝对路径特征
-    if (val.startsWith('/Users/') || val.startsWith('/private/') || val.startsWith('/tmp/') || val.startsWith('/Volumes/') || val.startsWith('~/')) {
+    // 绝对路径特征 (涵盖 ~, /Users, /Library, /Applications, /private, /tmp, /Volumes 等)
+    if (val.startsWith('/') || val.startsWith('~/')) {
         return true;
     }
 
@@ -676,8 +682,8 @@ function isCandidateFilePath(val) {
         }
     }
 
-    // 单个合法文件名 (具有合法白名单扩展名)
-    if (/^[a-zA-Z0-9_.-]+\.[a-zA-Z0-9_-]+$/.test(val)) {
+    // 单个合法文件名 (具有合法白名单扩展名，且不含空格)
+    if (!val.includes(' ') && /^[a-zA-Z0-9_.-]+\.[a-zA-Z0-9_-]+$/.test(val)) {
         return true;
     }
 
@@ -699,6 +705,9 @@ export function cleanSelectedFilePath(raw) {
     if (!raw || typeof raw !== 'string') return '';
     let text = raw.trim();
 
+    // 0. 去除不可见零宽字符与多余首尾空白
+    text = text.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+
     // 1. 去除首尾常见的包裹符号：引号、反引号、括号、书名号、中括号等
     text = text.replace(/^[`"'\(\[\{《「“‘]+|[`"'\)\]\}》」”’]+$/g, '').trim();
 
@@ -708,16 +717,22 @@ export function cleanSelectedFilePath(raw) {
         text = mdMatch[1].trim();
     }
 
-    // 3. 去除 file:// 协议头
+    // 3. 去除 file:// 协议头与 URL 编码
     if (text.startsWith('file://')) {
         text = text.replace(/^file:\/\//, '');
+    }
+    if (text.includes('%20') || text.includes('%')) {
+        try { text = decodeURIComponent(text); } catch (e) {}
     }
 
     // 4. 去除末尾的行号锚点，如 #L123-L145, #L123, :123:45, :123
     text = text.replace(/#L\d+(-L\d+)?$/i, '');
     text = text.replace(/:\d+(:\d+)?$/, '');
 
-    // 5. 再次去除两端可能残留的空白或引号
+    // 5. 去除首尾可能附带的标点符号（如冒号、逗号、分号）
+    text = text.replace(/^[:：\s]+|[,，:：;；\s]+$/g, '').trim();
+
+    // 6. 再次去除两端可能残留的包裹引号或反引号
     text = text.replace(/^[`"'\s]+|[`"'\s]+$/g, '').trim();
 
     return text;
@@ -1772,13 +1787,18 @@ function initSelectionEditorButton() {
         }
     }
 
-    // 监听选取变化与鼠标释放
+    // 监听选取变化与鼠标释放，增加多阶段延迟以匹配 React 浮层挂载时序
     document.addEventListener('selectionchange', () => {
         requestAnimationFrame(checkAndInjectButton);
+        setTimeout(checkAndInjectButton, 40);
+        setTimeout(checkAndInjectButton, 120);
     });
 
     document.addEventListener('mouseup', () => {
-        setTimeout(checkAndInjectButton, 30);
+        setTimeout(checkAndInjectButton, 10);
+        setTimeout(checkAndInjectButton, 50);
+        setTimeout(checkAndInjectButton, 150);
+        setTimeout(checkAndInjectButton, 300);
     });
 
     // MutationObserver 监听 Quote 浮动栏动态挂载
@@ -1788,6 +1808,7 @@ function initSelectionEditorButton() {
                 const quoteBtn = document.querySelector('button[data-testid="selection-quote-button"]');
                 if (quoteBtn) {
                     checkAndInjectButton();
+                    setTimeout(checkAndInjectButton, 50);
                     break;
                 }
             }
