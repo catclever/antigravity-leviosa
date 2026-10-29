@@ -1728,26 +1728,15 @@ function initSelectionEditorButton() {
         divider.style.flexShrink = '0';
         divider.style.alignSelf = 'center';
 
-        // 创建「在编辑器中打开」按钮，100% 继承原生 Quote 按钮样式与 Tailwind 交互状态
+        // 创建「Edit」快捷按钮，100% 继承原生 Quote 按钮尺寸与 Tailwind 交互状态，极简不撑开浮层
         editorBtn = document.createElement('button');
         editorBtn.id = 'ag-selection-editor-btn';
         editorBtn.dataset.testid = 'selection-open-editor-button';
         editorBtn.dataset.targetPath = candidatePath;
         if (targetLine) editorBtn.dataset.targetLine = String(targetLine);
-        editorBtn.className = 'flex items-center gap-1.5 justify-center px-2 py-1 transition-colors cursor-pointer hover:bg-secondary text-xs flex-1 min-w-0 rounded select-none';
-        editorBtn.title = '在内置编辑器中编辑本地文件 (⌘S 保存退出, Esc 退出; ⌥ 点击可在外部打开)';
-
-        const penIconSvg = `
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-80 shrink-0">
-                <path d="M12 20h9"></path>
-                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-            </svg>
-        `;
-
-        editorBtn.innerHTML = `
-            <span class="flex items-center justify-center">${penIconSvg}</span>
-            <span class="text-xs font-medium whitespace-nowrap">在编辑器中打开</span>
-        `;
+        editorBtn.className = 'flex items-center gap-1 justify-center px-2 py-1 transition-colors cursor-pointer hover:bg-secondary text-xs flex-1 min-w-0 rounded select-none';
+        editorBtn.title = '在编辑器中打开 (⌘S 保存退出, Esc 退出; ⌥ 在外部打开)';
+        editorBtn.innerHTML = `<span class="text-xs font-medium">Edit</span>`;
 
         // 关键防护：阻止 mousedown 导致浏览器的 selection 立即塌缩，确保 click 事件顺利执行
         editorBtn.addEventListener('mousedown', (e) => {
