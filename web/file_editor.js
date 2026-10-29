@@ -1716,14 +1716,39 @@ function initSelectionEditorButton() {
         let divider = parentBar.querySelector('#ag-selection-editor-divider');
 
         if (!isValid) {
-            // 如果当前选中的不是合法文件路径，保持原生 Quote 浮层纯净
+            // 如果当前选中的不是合法文件路径，保持原生 Quote 浮层纯净并还原原生样式
             if (editorBtn) editorBtn.remove();
             if (divider) divider.remove();
+            parentBar.style.transform = '';
+            parentBar.style.display = '';
+            parentBar.style.width = '';
+            parentBar.style.padding = '';
+            quoteBtn.style.flex = '';
+            quoteBtn.style.padding = '';
+            quoteBtn.style.minWidth = '';
             return;
         }
 
         lastActiveSelectionPath = candidatePath;
         lastActiveSelectionLine = targetLine;
+
+        // 1. 规范父容器布局：采用 inline-flex + 自适应内容包裹，彻底消除内部空白与非对称拉伸
+        parentBar.style.setProperty('display', 'inline-flex', 'important');
+        parentBar.style.setProperty('flex-direction', 'row', 'important');
+        parentBar.style.setProperty('align-items', 'center', 'important');
+        parentBar.style.setProperty('width', 'auto', 'important');
+        parentBar.style.setProperty('max-width', 'none', 'important');
+        parentBar.style.setProperty('box-sizing', 'border-box', 'important');
+        parentBar.style.setProperty('padding', '2px 4px', 'important');
+
+        // 2. 规范原生 Quote 按钮：去除 flex-1 挤压，给足两侧呼吸空间，与 Edit 完美对称
+        quoteBtn.style.setProperty('flex', '0 0 auto', 'important');
+        quoteBtn.style.setProperty('padding', '3px 8px', 'important');
+        quoteBtn.style.setProperty('white-space', 'nowrap', 'important');
+        quoteBtn.style.setProperty('min-width', 'auto', 'important');
+
+        // 3. 浮层视觉重心重平衡：因增加 Edit 按钮宽度，向左微调 20px 使浮层整体中心贴合选区末尾，不再向右过度悬挂
+        parentBar.style.setProperty('transform', 'translateX(-20px)', 'important');
 
         // 若已存在，更新当前目标路径与行号
         if (editorBtn) {
@@ -1733,23 +1758,27 @@ function initSelectionEditorButton() {
             return;
         }
 
-        // 创建微型视觉分割线
+        // 创建微型视觉分割线 (完美垂直居中)
         divider = document.createElement('div');
         divider.id = 'ag-selection-editor-divider';
         divider.style.width = '1px';
-        divider.style.height = '14px';
-        divider.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
-        divider.style.margin = '0 2px';
+        divider.style.height = '12px';
+        divider.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+        divider.style.margin = '0 3px';
         divider.style.flexShrink = '0';
         divider.style.alignSelf = 'center';
 
-        // 创建「Edit」快捷按钮，100% 继承原生 Quote 按钮尺寸与 Tailwind 交互状态，极简不撑开浮层
+        // 创建「Edit」快捷按钮，100% 继承原生 Quote 按钮交互与 Tailwind 状态，无缝对称
         editorBtn = document.createElement('button');
         editorBtn.id = 'ag-selection-editor-btn';
         editorBtn.dataset.testid = 'selection-open-editor-button';
         editorBtn.dataset.targetPath = candidatePath;
         if (targetLine) editorBtn.dataset.targetLine = String(targetLine);
-        editorBtn.className = 'flex items-center gap-1 justify-center px-2 py-1 transition-colors cursor-pointer hover:bg-secondary text-xs flex-1 min-w-0 rounded select-none';
+        editorBtn.className = 'flex items-center gap-1 justify-center transition-colors cursor-pointer hover:bg-secondary text-xs rounded select-none';
+        editorBtn.style.setProperty('flex', '0 0 auto', 'important');
+        editorBtn.style.setProperty('padding', '3px 8px', 'important');
+        editorBtn.style.setProperty('white-space', 'nowrap', 'important');
+        editorBtn.style.setProperty('min-width', 'auto', 'important');
         editorBtn.title = '在编辑器中打开 (⌘S 保存退出, Esc 退出; ⌥ 在外部打开)';
         editorBtn.innerHTML = `<span class="text-xs font-medium">Edit</span>`;
 
