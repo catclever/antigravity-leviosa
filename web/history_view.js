@@ -238,8 +238,8 @@ function ensureHistoryContainer() {
                         <span id="leviosa-filter-label">All</span>
                     </button>
 
-                    <!-- 一键清理子代理按钮 -->
-                    <button id="leviosa-clean-subagents-btn" class="inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-muted border border-border text-secondary-foreground hover:text-destructive hover:border-destructive/40 h-8 px-2.5 rounded-lg text-xs gap-1.5" title="Clean Subagents">
+                    <!-- 一键清理过期子代理按钮 (保护最近1小时活跃子代理) -->
+                    <button id="leviosa-clean-subagents-btn" class="inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-muted border border-border text-secondary-foreground hover:text-destructive hover:border-destructive/40 h-8 px-2.5 rounded-lg text-xs gap-1.5" title="清理 1 小时以前的子代理（最近活跃及运行中的子代理将安全保留）">
                         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M3 6h18"></path>
                             <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
@@ -307,18 +307,18 @@ function ensureHistoryContainer() {
         fetchAndRenderHistory();
     });
 
-    // 绑定一键清理子代理按钮
+    // 绑定一键清理过期子代理按钮 (保护最近 1 小时活跃子代理)
     const cleanSubagentsBtn = historyContainer.querySelector('#leviosa-clean-subagents-btn');
     const cleanSubagentsLabel = historyContainer.querySelector('#leviosa-clean-subagents-label');
     if (cleanSubagentsBtn) {
         cleanSubagentsBtn.addEventListener('click', async () => {
-            const confirmed = window.confirm('确定要清理所有后台 Subagent 目录与记录吗？\n将运行 clean_subagents.py 并释放子代理占用的数据。');
+            const confirmed = window.confirm('确定要清理 1 小时以前的后台 Subagent 孤儿目录与记录吗？\n（最近 1 小时内活跃或正在运行的子代理将安全保留）');
             if (!confirmed) return;
 
             cleanSubagentsBtn.disabled = true;
             cleanSubagentsLabel.textContent = 'Cleaning...';
             try {
-                const res = await fetch(`${API_BASE}?action=clean_subagents&nocache=1`);
+                const res = await fetch(`${API_BASE}?action=clean_subagents&minAgeHours=1.0&nocache=1`);
                 const data = await res.json();
                 if (data.success) {
                     cleanSubagentsLabel.textContent = 'Cleaned!';

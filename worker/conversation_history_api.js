@@ -364,16 +364,33 @@ module.exports = async function(query) {
 
     if (action === 'clean_subagents') {
         try {
-            // 1. 同步从本地 SQLite 数据库彻底移除 subagent / CLI 自动化任务记录
+            // 时间过滤与运行保护：
+            // 1. 支持按时间过滤 (默认保留最近 1.0 小时内活跃的 subagent)
+            // 2. 处于非空闲状态 (not_fully_idle = '1' 或 status = 'CASCADE_RUN_STATUS_RUNNING') 的子代理一律强制保护不删除
+            const minAgeHours = (query.minAgeHours !== undefined && query.minAgeHours !== null && !isNaN(parseFloat(query.minAgeHours)))
+                ? parseFloat(query.minAgeHours)
+                : 1.0;
+            const minutesOffset = Math.max(0, Math.round(minAgeHours * 60));
+
+            const timeCondition = minAgeHours > 0
+                ? `AND datetime(last_modified_time) < datetime('now', '-${minutesOffset} minutes') AND (not_fully_idle IS NULL OR not_fully_idle != '1') AND (status IS NULL OR status != 'CASCADE_RUN_STATUS_RUNNING')`
+                : `AND (not_fully_idle IS NULL OR not_fully_idle != '1') AND (status IS NULL OR status != 'CASCADE_RUN_STATUS_RUNNING')`;
+
+            // 1. 同步从本地 SQLite 数据库移除过期且非活跃的 subagent / CLI 自动化任务记录
             const deleteSubagentsSql = `
-                DELETE FROM conversation_summaries WHERE (source = 'CORTEX_TRAJECTORY_SOURCE_CLI' OR nesting_depth > 0 OR (parent_conversation_id IS NOT NULL AND parent_conversation_id != ''));
+                DELETE FROM conversation_summaries 
+                WHERE (source = 'CORTEX_TRAJECTORY_SOURCE_CLI' OR nesting_depth > 0 OR (parent_conversation_id IS NOT NULL AND parent_conversation_id != ''))
+                ${timeCondition};
                 DELETE FROM conversations_fts WHERE conversation_id NOT IN (SELECT conversation_id FROM conversation_summaries);
             `;
             execSync(`sqlite3 "${dbPath}" "${deleteSubagentsSql}"`, { stdio: ['pipe', 'pipe', 'ignore'] });
 
-            // 2. 同步清理 PVE 远程服务器上的数据库记录，避免 Mutagen 双向同步将其重新拉回 Mac
+            // 2. 同步清理 PVE 远程服务器上的过期数据库记录，避免 Mutagen 双向同步将其重新拉回 Mac
             try {
-                execSync(`ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no Antigravity 'python3 -c "import sqlite3, os; conn=sqlite3.connect(os.path.expanduser(\\"~/.gemini/antigravity/conversation_summaries.db\\")); conn.execute(\\"DELETE FROM conversation_summaries WHERE (source = \\x27CORTEX_TRAJECTORY_SOURCE_CLI\\x27 OR nesting_depth > 0 OR (parent_conversation_id IS NOT NULL AND parent_conversation_id != \\x27\\x27))\\"); conn.commit()"'`, {
+                const pveCondition = minAgeHours > 0
+                    ? `AND datetime(last_modified_time) < datetime(\\'now\\', \\'-${minutesOffset} minutes\\') AND (not_fully_idle IS NULL OR not_fully_idle != \\'1\\') AND (status IS NULL OR status != \\'CASCADE_RUN_STATUS_RUNNING\\')`
+                    : `AND (not_fully_idle IS NULL OR not_fully_idle != \\'1\\') AND (status IS NULL OR status != \\'CASCADE_RUN_STATUS_RUNNING\\')`;
+                execSync(`ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no Antigravity 'python3 -c "import sqlite3, os; conn=sqlite3.connect(os.path.expanduser(\\"~/.gemini/antigravity/conversation_summaries.db\\")); conn.execute(\\"DELETE FROM conversation_summaries WHERE (source = \\x27CORTEX_TRAJECTORY_SOURCE_CLI\\x27 OR nesting_depth > 0 OR (parent_conversation_id IS NOT NULL AND parent_conversation_id != \\x27\\x27)) ${pveCondition}\\"); conn.commit()"'`, {
                     stdio: ['ignore', 'ignore', 'ignore'],
                     timeout: 5000
                 });
@@ -390,9 +407,10 @@ module.exports = async function(query) {
             const scriptPath = candidatePaths.find(p => fs.existsSync(p));
             let stdout = '';
             if (scriptPath) {
+                const minAgeArg = minAgeHours > 0 ? `--min-age-hours ${minAgeHours}` : '--min-age-hours 0';
                 const excludeArg = query.exclude ? `--exclude "${query.exclude}"` : '';
                 try {
-                    stdout = execSync(`python3 "${scriptPath}" ${excludeArg}`, {
+                    stdout = execSync(`python3 "${scriptPath}" ${minAgeArg} ${excludeArg}`, {
                         encoding: 'utf-8',
                         stdio: ['pipe', 'pipe', 'pipe'],
                         timeout: 30000
@@ -402,7 +420,13 @@ module.exports = async function(query) {
                 }
             }
 
-            return { success: true, action: 'clean_subagents', stdout, message: 'Subagents successfully cleaned on Mac and PVE' };
+            return { 
+                success: true, 
+                action: 'clean_subagents', 
+                minAgeHours,
+                stdout, 
+                message: `Subagents older than ${minAgeHours}h successfully cleaned on Mac and PVE (recent and active subagents protected)` 
+            };
         } catch (err) {
             return { success: false, error: err.message };
         }

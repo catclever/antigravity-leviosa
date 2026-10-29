@@ -747,11 +747,16 @@ export async function resolveFilePathOnDisk(rawPath) {
         pathToCheck = pathToCheck.replace(/^file:\/\//, '');
     }
 
-    // 1. 如果以 ~ 开头，后端 resolveHome 会自动展开
+    // 1. 如果以 ~ 开头，后端 resolveHome 会自动展开，同时在前端提供双重保障
     if (pathToCheck.startsWith('~/')) {
         const stat = await checkFileStat(pathToCheck);
         if (stat && stat.success && stat.isFile) {
             return stat.path;
+        }
+        const expandedHome = `/Users/kael/${pathToCheck.slice(2)}`;
+        const expStat = await checkFileStat(expandedHome);
+        if (expStat && expStat.success && expStat.isFile) {
+            return expStat.path || expandedHome;
         }
     }
 
@@ -1630,48 +1635,25 @@ export async function openFileInEditor(targetPath, targetLine = null) {
         return;
     }
 
-    // 寻找现有的预览面板 (如果用户已经打开了文件预览)
-    let panelInfo = null;
-    const existingPanels = Array.from(document.querySelectorAll('div'));
-    for (const el of existingPanels) {
-        if (el.closest('aside, nav, .bg-sidebar, #leviosa-history-view, #leviosa-kanban-panel, [role="dialog"], [data-testid="conversation-view"], [data-testid="conversation-list"]')) {
-            continue;
-        }
-        const rect = el.getBoundingClientRect();
-        if (rect.width >= 200 && rect.height >= 200 && rect.left >= 200) {
-            const headerCandidate = el.firstElementChild;
-            if (headerCandidate) {
-                panelInfo = {
-                    panel: el,
-                    contentContainer: el.lastElementChild || el,
-                    header: headerCandidate,
-                    filePath: resolvedPath,
-                    rawBtn: null,
-                    previewBtn: null
-                };
-                break;
-            }
-        }
-    }
-
-    if (!panelInfo) {
-        // 独立抽屉模式 (Drawer Mode)
-        panelInfo = {
-            panel: null,
-            contentContainer: null,
-            header: null,
-            filePath: resolvedPath,
-            rawBtn: null,
-            previewBtn: null
-        };
-    }
+    // 从外部或对话选区打开文件，一律使用独立 Pro 抽屉模式 (Drawer Mode)，确保右侧精准滑出
+    const panelInfo = {
+        panel: null,
+        contentContainer: null,
+        header: null,
+        filePath: resolvedPath,
+        rawBtn: null,
+        previewBtn: null
+    };
 
     mountInlineEditor(panelInfo, fileData.content, targetLine);
 }
 
+// ==========================================
 // 8.2 对话选中文本「在编辑器中打开」注入模块
+// ==========================================
 let lastActiveSelectionPath = '';
 let lastActiveSelectionLine = null;
+let isOpeningAnyFile = false;
 
 function initSelectionEditorButton() {
     console.log('⚡ [Antigravity Mod] 对话选中文档/代码快速编辑注入已启动');
@@ -1716,6 +1698,11 @@ function initSelectionEditorButton() {
         let divider = parentBar.querySelector('#ag-selection-editor-divider');
 
         if (!isValid) {
+            // 如果用户正在点击打开文件，绝对不能提前销毁按钮！
+            if (isOpeningAnyFile) return;
+            // 如果鼠标正按在或悬停在 Edit 按钮上，延缓销毁以避免打断点击事件链
+            if (editorBtn && (editorBtn.matches(':active') || editorBtn.matches(':hover'))) return;
+
             // 如果当前选中的不是合法文件路径，保持原生 Quote 浮层纯净并还原原生样式
             if (editorBtn) editorBtn.remove();
             if (divider) divider.remove();
@@ -1782,28 +1769,54 @@ function initSelectionEditorButton() {
         editorBtn.title = '在编辑器中打开 (⌘S 保存退出, Esc 退出; ⌥ 在外部打开)';
         editorBtn.innerHTML = `<span class="text-xs font-medium">Edit</span>`;
 
-        // 关键防护：阻止 mousedown 导致浏览器的 selection 立即塌缩，确保 click 事件顺利执行
-        editorBtn.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
+        let isOpeningThis = false;
+        async function handleEditAction(e) {
+            if (isOpeningThis) return;
+            isOpeningThis = true;
+            isOpeningAnyFile = true;
 
-        editorBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
 
             const targetPath = editorBtn.dataset.targetPath || lastActiveSelectionPath;
             const targetLineNum = editorBtn.dataset.targetLine ? parseInt(editorBtn.dataset.targetLine, 10) : lastActiveSelectionLine;
-            if (!targetPath) return;
+            console.log('⚡ [SelectionEditor] 触发打开编辑:', targetPath, '行号:', targetLineNum);
 
-            // 快捷操作：若按住 Option/Alt 键，调用 Finder / 外部工具打开
-            if (e.altKey) {
-                openFileInFinderBackend('', '', targetPath);
+            if (!targetPath) {
+                isOpeningThis = false;
+                isOpeningAnyFile = false;
                 return;
             }
 
-            // 打开内置 Pro 编辑器
-            await openFileInEditor(targetPath, targetLineNum);
+            try {
+                if (e && e.altKey) {
+                    openFileInFinderBackend('', '', targetPath);
+                } else {
+                    await openFileInEditor(targetPath, targetLineNum);
+                }
+            } catch (err) {
+                console.error('⚡ [SelectionEditor] 打开失败:', err);
+                showToast(`打开失败: ${err?.message || '未知异常'}`, 'error', 3000);
+            } finally {
+                setTimeout(() => {
+                    isOpeningThis = false;
+                    isOpeningAnyFile = false;
+                }, 1000);
+            }
+        }
+
+        // 关键机制：在 mousedown 阶段即刻触发，绝不因 selection 塌缩或 mouseup 延迟导致事件被取消！
+        editorBtn.addEventListener('mousedown', (e) => {
+            if (e.button === 0) {
+                handleEditAction(e);
+            }
+        });
+
+        // 兜底保障 click 事件
+        editorBtn.addEventListener('click', (e) => {
+            handleEditAction(e);
         });
 
         // 紧贴在 Quote 按钮右侧插入
@@ -1823,7 +1836,11 @@ function initSelectionEditorButton() {
         setTimeout(checkAndInjectButton, 120);
     });
 
-    document.addEventListener('mouseup', () => {
+    document.addEventListener('mouseup', (e) => {
+        // 若鼠标释放发生在 Edit 按钮内部，绝对不触发选区清理
+        if (e.target && e.target.closest && e.target.closest('#ag-selection-editor-btn')) {
+            return;
+        }
         setTimeout(checkAndInjectButton, 10);
         setTimeout(checkAndInjectButton, 50);
         setTimeout(checkAndInjectButton, 150);
