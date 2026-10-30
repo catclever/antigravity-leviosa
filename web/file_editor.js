@@ -911,11 +911,66 @@ function extractPathFromElementOrChildren(el) {
 function detectPanelAndFilePath(targetElement) {
     if (!targetElement) return null;
 
-    // 核心区域防护锁：绝不在侧边栏、历史记录、对话聊天流、设置对话框或看板中触发！
+    // 核心区域防护锁：绝不在左侧栏、历史记录、对话聊天流、设置对话框或看板中触发！
     if (targetElement.closest('aside, nav, .bg-sidebar, #leviosa-history-view, #leviosa-kanban-panel, [role="dialog"], [data-testid="conversation-view"], [data-testid="conversation-list"]')) {
         return null;
     }
 
+    // 1. 优先检测新版本全功能工作区代码查看器 (Antigravity Workspace Code Viewer)
+    const fileViewerRoot = targetElement.closest('.file-viewer-root');
+    if (fileViewerRoot) {
+        const codeLine = targetElement.closest('.code-line') || fileViewerRoot.querySelector('.code-line[data-file-uri]');
+        let rawUri = codeLine?.getAttribute('data-file-uri');
+        let targetLine = null;
+        if (codeLine) {
+            const lineStr = codeLine.getAttribute('data-line-number');
+            if (lineStr) targetLine = parseInt(lineStr, 10);
+        }
+
+        if (!rawUri) {
+            const anyLine = fileViewerRoot.querySelector('[data-file-uri]');
+            rawUri = anyLine?.getAttribute('data-file-uri');
+        }
+
+        if (rawUri) {
+            let cleanPath = decodeURIComponent(rawUri.replace(/^file:\/\//, '').trim());
+
+            // 寻找同时容纳代码查看器与右侧文件树的共同父容器（覆盖整块工作区与文件树）
+            let workspaceContainer = fileViewerRoot.closest('.relative.flex.w-full.h-full') ||
+                                    fileViewerRoot.closest('[style*="container-type"]') ||
+                                    fileViewerRoot.closest('.w-full.h-full.flex.flex-col') ||
+                                    fileViewerRoot.parentElement?.parentElement?.parentElement?.parentElement?.parentElement ||
+                                    fileViewerRoot;
+
+            let probe = fileViewerRoot.parentElement;
+            while (probe && probe !== document.body && probe !== document.documentElement) {
+                if (probe.querySelector && probe.querySelector('[data-testid="tab-file-tree-sidebar"]')) {
+                    workspaceContainer = probe;
+                    break;
+                }
+                probe = probe.parentElement;
+            }
+
+            return {
+                panel: workspaceContainer,
+                contentContainer: fileViewerRoot,
+                filePath: cleanPath,
+                header: null,
+                rawBtn: null,
+                previewBtn: null,
+                targetLine: targetLine,
+                isWorkspaceViewer: true
+            };
+        }
+    }
+
+    // 2. 如果点击或悬停在工作区右侧文件树上：
+    if (targetElement.closest('[data-testid="tab-file-tree-sidebar"]')) {
+        // 文件树侧边栏本身不触发常规探测，避免在文件树容器上误触发提示
+        return null;
+    }
+
+    // 3. 经典右侧文件预览面板探测
     let curr = targetElement;
     while (curr && curr !== document.body && curr !== document.documentElement) {
         // 如果向上回溯到了侧边栏或对话流容器，立即中止
@@ -1039,7 +1094,9 @@ function mountInlineEditor(panelInfo, initialContent, targetLine = null) {
             wrapper.style.left = `${Math.round(left)}px`;
             wrapper.style.width = `${Math.round(width)}px`;
             wrapper.style.height = `${Math.round(height)}px`;
-            wrapper.style.borderRadius = '0';
+            wrapper.style.borderRadius = panelInfo.isWorkspaceViewer ? '6px 0 0 6px' : '0';
+            wrapper.style.borderLeft = panelInfo.isWorkspaceViewer ? '1px solid rgba(255, 255, 255, 0.16)' : '1px solid rgba(255, 255, 255, 0.12)';
+            wrapper.style.boxShadow = panelInfo.isWorkspaceViewer ? '-12px 0 40px rgba(0, 0, 0, 0.65)' : '0 12px 48px rgba(0, 0, 0, 0.7)';
         } else {
             // 独立抽屉模式 (Drawer Mode)：右侧滑出 Pro 编辑器
             const top = 38;
@@ -1571,6 +1628,7 @@ function mountInlineEditor(panelInfo, initialContent, targetLine = null) {
             showToast(`✓ 文件已保存并退出编辑: ${fileName}`, 'success', 2200);
             destroyEditor();
 
+            // 1. 经典预览面板刷新
             if (previewBtn) {
                 setTimeout(() => {
                     if (rawBtn) {
@@ -1582,6 +1640,15 @@ function mountInlineEditor(panelInfo, initialContent, targetLine = null) {
                         try { previewBtn.click(); } catch (e) {}
                     }
                 }, 100);
+            }
+
+            // 2. 新版工作区联动刷新：如果存在侧边栏刷新按钮，触发一次重载更新磁盘最新内容
+            const refreshBtn = document.querySelector('button[aria-label="Refresh"][data-tooltip-id*="Workspaces"]') ||
+                               document.querySelector('button[aria-label="Refresh"]');
+            if (refreshBtn) {
+                setTimeout(() => {
+                    try { refreshBtn.click(); } catch (e) {}
+                }, 120);
             }
         } else {
             isSaving = false;
@@ -1669,14 +1736,32 @@ export async function openFileInEditor(targetPath, targetLine = null) {
         return;
     }
 
-    // 从外部或对话选区打开文件，一律使用独立 Pro 抽屉模式 (Drawer Mode)，确保右侧精准滑出
+    // 从外部或对话选区打开文件：优先覆盖当前活动的工作区（包含代码查看器与文件树），营造独占专注编辑体验
+    let activeWorkspacePanel = null;
+    const treeSidebar = document.querySelector('[data-testid="tab-file-tree-sidebar"]');
+    const activeViewer = document.querySelector('.file-viewer-root');
+    if (activeViewer || treeSidebar) {
+        let probe = (activeViewer || treeSidebar).parentElement;
+        while (probe && probe !== document.body && probe !== document.documentElement) {
+            const rect = probe.getBoundingClientRect();
+            if (rect.width >= 300 && rect.height >= 200 && rect.left >= 200) {
+                if (probe.querySelector && (probe.querySelector('.file-viewer-root') || probe.querySelector('[data-testid="tab-file-tree-sidebar"]'))) {
+                    activeWorkspacePanel = probe;
+                    break;
+                }
+            }
+            probe = probe.parentElement;
+        }
+    }
+
     const panelInfo = {
-        panel: null,
+        panel: activeWorkspacePanel,
         contentContainer: null,
         header: null,
         filePath: resolvedPath,
         rawBtn: null,
-        previewBtn: null
+        previewBtn: null,
+        isWorkspaceViewer: Boolean(activeWorkspacePanel)
     };
 
     mountInlineEditor(panelInfo, fileData.content, targetLine);
@@ -1948,7 +2033,7 @@ export function initFileEditor() {
             return;
         }
 
-        mountInlineEditor(panelInfo, initialContent);
+        mountInlineEditor(panelInfo, initialContent, panelInfo.targetLine || null);
     }, true);
 
     document.addEventListener('mouseover', (e) => {
@@ -1960,6 +2045,22 @@ export function initFileEditor() {
 
         // 核心屏障：左侧边栏、历史记录、看板或聊天对话区绝对不触发任何悬停探测
         if (target.closest('aside, nav, .bg-sidebar, #leviosa-history-view, #leviosa-kanban-panel, [role="dialog"], [data-testid="conversation-view"], [data-testid="conversation-list"]')) return;
+
+        // 文件树侧边栏绝不触发乱跳的悬停提示
+        if (target.closest('[data-testid="tab-file-tree-sidebar"]')) return;
+
+        // 新版代码查看器：仅针对有效行元素设置提示
+        if (target.closest('.file-viewer-root')) {
+            const line = target.closest('.code-line');
+            if (line && line.dataset?.fileUri) {
+                target.dataset.agEditorHintReady = 'true';
+                if (!target.title) {
+                    const baseName = line.dataset.fileUri.substring(line.dataset.fileUri.lastIndexOf('/') + 1);
+                    target.title = `💡 双击可编辑本地文件: ${decodeURIComponent(baseName)} (⌘S 保存退出, Esc 退出)`;
+                }
+            }
+            return;
+        }
 
         const panelInfo = detectPanelAndFilePath(target);
         if (panelInfo && panelInfo.filePath) {
