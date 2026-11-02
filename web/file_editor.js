@@ -792,6 +792,15 @@ export async function resolveFilePathOnDisk(rawPath) {
         candidates.push(`/Users/kael/Projects/${activeProject}/${pathToCheck}`);
         candidates.push(`/Users/kael/Library/Services/taichi/apps/${activeProject}/${pathToCheck}`);
     }
+
+    // 3.5 增加当前会话 Brain Artifact 目录候选探测 (如会话产物 README.md)
+    try {
+        const uuidMatch = window.location.pathname.match(/\/c\/([a-f0-9\-]+)/i);
+        if (uuidMatch && uuidMatch[1]) {
+            candidates.push(`/Users/kael/.gemini/antigravity/brain/${uuidMatch[1]}/${pathToCheck}`);
+        }
+    } catch (e) {}
+
     candidates.push(`/Users/kael/Projects/antigravity-leviosa/${pathToCheck}`);
     candidates.push(`/Users/kael/Projects/${pathToCheck}`);
     candidates.push(`/Users/kael/${pathToCheck}`);
@@ -814,7 +823,8 @@ export async function resolveFilePathOnDisk(rawPath) {
 
 const PATH_PROP_KEYS = new Set([
     'filepath', 'filepaths', 'path', 'uri', 'filename', 'fileuri',
-    'sourcepath', 'targetpath', 'abspath', 'localpath'
+    'sourcepath', 'targetpath', 'abspath', 'localpath',
+    'artifact', 'file', 'item', 'doc', 'tab', 'fileinfo'
 ]);
 
 function findAbsolutePathInFiber(el) {
@@ -828,7 +838,7 @@ function findAbsolutePathInFiber(el) {
             while (fiber && attempts < 15) {
                 if (fiber.memoizedProps) {
                     let foundPath = null;
-                    function safeFind(obj, maxDepth = 3, currentDepth = 0, visited = new Set()) {
+                    function safeFind(obj, maxDepth = 4, currentDepth = 0, visited = new Set()) {
                         if (!obj || typeof obj !== 'object' || currentDepth > maxDepth || visited.has(obj) || foundPath) return;
                         visited.add(obj);
 
@@ -838,13 +848,17 @@ function findAbsolutePathInFiber(el) {
                         for (const key of keys) {
                             if (key.startsWith('__') || key === 'children' || key === 'parent' || key === 'owner' || key === 'store') continue;
                             const lowerKey = key.toLowerCase();
-                            // 仅检查包含路径含义的属性字段名，彻底避免抓取类名/插件元数据！
                             if (!PATH_PROP_KEYS.has(lowerKey)) continue;
 
                             const val = obj[key];
                             if (typeof val === 'string' && isCandidateFilePath(val)) {
-                                foundPath = val;
-                                return;
+                                if (val.startsWith('/') || val.startsWith('~/') || val.startsWith('file://')) {
+                                    foundPath = val;
+                                    return;
+                                }
+                                if (!foundPath) foundPath = val;
+                            } else if (val && typeof val === 'object') {
+                                safeFind(val, maxDepth, currentDepth + 1, visited);
                             }
                         }
                     }
@@ -864,14 +878,29 @@ function findAbsolutePathInFiber(el) {
 function extractPathFromElementOrChildren(el) {
     if (!el) return null;
 
-    const titleEls = [el, ...Array.from(el.querySelectorAll('[title]'))];
-    for (const tEl of titleEls) {
-        const title = (tEl.getAttribute('title') || '').trim();
-        if (isCandidateFilePath(title)) {
-            return title;
+    // 0. 优先检测当前页面 URL 的激活 tab 路由 (如 tab=artifact__file%3A%2F%2F... 或 tab=file%3A%2F%2F...)
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab');
+        if (tabParam) {
+            let decoded = decodeURIComponent(tabParam);
+            if (decoded.startsWith('artifact__file://')) {
+                const pathFromUrl = decoded.replace('artifact__file://', '');
+                if (isCandidateFilePath(pathFromUrl)) return pathFromUrl;
+            } else if (decoded.startsWith('file://')) {
+                const pathFromUrl = decoded.replace('file://', '');
+                if (isCandidateFilePath(pathFromUrl)) return pathFromUrl;
+            }
         }
+    } catch (e) {}
+
+    // 1. 优先通过 React Fiber 深度提取组件内绑定的物理绝对路径（避免被 DOM 缩略短名截断）
+    const fiberPath = findAbsolutePathInFiber(el);
+    if (fiberPath && isCandidateFilePath(fiberPath)) {
+        return fiberPath;
     }
 
+    // 2. 检查显式属性 [data-path], [data-filepath], [data-uri]
     const dataEls = [el, ...Array.from(el.querySelectorAll('[data-path], [data-filepath], [data-file-path], [data-uri]'))];
     for (const dEl of dataEls) {
         const p = dEl.getAttribute('data-path') || dEl.getAttribute('data-filepath') || dEl.getAttribute('data-file-path') || dEl.getAttribute('data-uri');
@@ -880,6 +909,17 @@ function extractPathFromElementOrChildren(el) {
         }
     }
 
+    // 3. 检查 [title] 属性
+    const titleEls = [el, ...Array.from(el.querySelectorAll('[title]'))];
+    for (const tEl of titleEls) {
+        const title = (tEl.getAttribute('title') || '').trim();
+        if (isCandidateFilePath(title)) {
+            return title;
+        }
+    }
+
+    // 4. 检查 DOM 节点文本：优先提取包含路径层级的绝对或相对路径，纯文件名暂作兜底
+    let fallbackShortName = null;
     const allNodes = [el, ...Array.from(el.querySelectorAll('span, div, p, a, code, h1, h2, h3, h4'))];
     for (const node of allNodes) {
         if (node.children.length > 2) continue;
@@ -896,16 +936,13 @@ function extractPathFromElementOrChildren(el) {
         }
 
         if (isCandidateFilePath(text)) {
-            return text;
+            if (!fallbackShortName) {
+                fallbackShortName = text;
+            }
         }
     }
 
-    const fiberPath = findAbsolutePathInFiber(el);
-    if (fiberPath && isCandidateFilePath(fiberPath)) {
-        return fiberPath;
-    }
-
-    return null;
+    return fallbackShortName;
 }
 
 function detectPanelAndFilePath(targetElement) {
@@ -1628,7 +1665,17 @@ function mountInlineEditor(panelInfo, initialContent, targetLine = null) {
             showToast(`✓ 文件已保存并退出编辑: ${fileName}`, 'success', 2200);
             destroyEditor();
 
-            // 1. 经典预览面板刷新
+            // 1. 同步回写底层面板已渲染的 DOM 视图，让用户所见即所得
+            if (contentContainer) {
+                try {
+                    const targetTextEl = contentContainer.querySelector('pre, code, textarea') || contentContainer;
+                    if (targetTextEl && (targetTextEl.tagName === 'PRE' || targetTextEl.tagName === 'CODE' || targetTextEl.tagName === 'TEXTAREA' || targetTextEl.children.length === 0)) {
+                        targetTextEl.textContent = newContent;
+                    }
+                } catch (e) {}
+            }
+
+            // 2. 经典预览面板刷新
             if (previewBtn) {
                 setTimeout(() => {
                     if (rawBtn) {
@@ -1642,7 +1689,7 @@ function mountInlineEditor(panelInfo, initialContent, targetLine = null) {
                 }, 100);
             }
 
-            // 2. 新版工作区联动刷新：如果存在侧边栏刷新按钮，触发一次重载更新磁盘最新内容
+            // 3. 新版工作区联动刷新：如果存在侧边栏刷新按钮，触发一次重载更新磁盘最新内容
             const refreshBtn = document.querySelector('button[aria-label="Refresh"][data-tooltip-id*="Workspaces"]') ||
                                document.querySelector('button[aria-label="Refresh"]');
             if (refreshBtn) {
