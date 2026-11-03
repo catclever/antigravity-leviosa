@@ -945,6 +945,70 @@ function extractPathFromElementOrChildren(el) {
     return fallbackShortName;
 }
 
+// ==========================================
+// 6.5 寻获右侧工作区根容器（覆盖代码查看器与文件树侧边栏）
+// ==========================================
+function findWorkspaceRootContainer(hintElement = null) {
+    const activeViewer = hintElement?.closest?.('.file-viewer-root') || document.querySelector('.file-viewer-root');
+    const treeSidebar = document.querySelector('[data-testid="tab-file-tree-sidebar"]');
+
+    if (activeViewer && treeSidebar) {
+        // 两者都存在：寻找同时包含代码查看器和文件树侧边栏的最外层公共容器
+        let probe = activeViewer.parentElement;
+        let commonContainer = null;
+        while (probe && probe !== document.body && probe !== document.documentElement) {
+            if (probe.contains(treeSidebar)) {
+                commonContainer = probe;
+                break;
+            }
+            probe = probe.parentElement;
+        }
+
+        if (commonContainer) {
+            // 继续尝试向上找到该右侧工作区的顶级容器（避免截断外层 padding/border），但绝不越界侵入左侧栏
+            let outer = commonContainer;
+            while (outer.parentElement && 
+                   outer.parentElement !== document.body && 
+                   outer.parentElement !== document.documentElement) {
+                const parentRect = outer.parentElement.getBoundingClientRect();
+                // 确保父容器仍在右半侧，不越界侵入左侧对话栏 (left >= 200)，且宽度不发生全屏式跳跃
+                if (parentRect.left >= 200 && parentRect.width >= outer.getBoundingClientRect().width) {
+                    outer = outer.parentElement;
+                } else {
+                    break;
+                }
+            }
+            return outer;
+        }
+    }
+
+    // 仅存在代码查看器或仅存在文件树
+    const baseEl = activeViewer || treeSidebar;
+    if (baseEl) {
+        let probe = baseEl;
+        let bestPanel = baseEl;
+        while (probe && probe !== document.body && probe !== document.documentElement) {
+            // 如果向上回溯到了左侧边栏或对话流容器，立即中止
+            if (probe.matches && probe.matches('aside, nav, .bg-sidebar, #leviosa-history-view, #leviosa-kanban-panel, [role="dialog"], [data-testid="conversation-view"], [data-testid="conversation-list"]')) {
+                break;
+            }
+            const rect = probe.getBoundingClientRect();
+            if (rect.left >= 200 && rect.height >= 200) {
+                bestPanel = probe;
+            }
+            // 命中工作区分栏标准容器特征
+            if (probe.matches && (probe.matches('[style*="container-type"]') || probe.matches('.relative.flex.w-full.h-full') || probe.matches('.w-full.h-full.flex.flex-col'))) {
+                bestPanel = probe;
+                break;
+            }
+            probe = probe.parentElement;
+        }
+        return bestPanel;
+    }
+
+    return null;
+}
+
 function detectPanelAndFilePath(targetElement) {
     if (!targetElement) return null;
 
@@ -972,21 +1036,8 @@ function detectPanelAndFilePath(targetElement) {
         if (rawUri) {
             let cleanPath = decodeURIComponent(rawUri.replace(/^file:\/\//, '').trim());
 
-            // 寻找同时容纳代码查看器与右侧文件树的共同父容器（覆盖整块工作区与文件树）
-            let workspaceContainer = fileViewerRoot.closest('.relative.flex.w-full.h-full') ||
-                                    fileViewerRoot.closest('[style*="container-type"]') ||
-                                    fileViewerRoot.closest('.w-full.h-full.flex.flex-col') ||
-                                    fileViewerRoot.parentElement?.parentElement?.parentElement?.parentElement?.parentElement ||
-                                    fileViewerRoot;
-
-            let probe = fileViewerRoot.parentElement;
-            while (probe && probe !== document.body && probe !== document.documentElement) {
-                if (probe.querySelector && probe.querySelector('[data-testid="tab-file-tree-sidebar"]')) {
-                    workspaceContainer = probe;
-                    break;
-                }
-                probe = probe.parentElement;
-            }
+            // 寻找同时容纳代码查看器与右侧文件树的顶级父容器（覆盖整块工作区与文件树）
+            const workspaceContainer = findWorkspaceRootContainer(fileViewerRoot) || fileViewerRoot;
 
             return {
                 panel: workspaceContainer,
@@ -1118,26 +1169,46 @@ function mountInlineEditor(panelInfo, initialContent, targetLine = null) {
     wrapper.style.overflow = 'hidden';
 
     function syncBounds() {
+        // 计算理想的抽屉/工作区宽度（至少 560px，或占屏幕 48%~50%，最大 1100px）
+        const idealDrawerWidth = Math.min(1100, Math.max(560, Math.round(window.innerWidth * 0.48)));
+
         if (panel) {
             const panelRect = panel.getBoundingClientRect();
             const headerRect = header ? header.getBoundingClientRect() : null;
 
-            const top = headerRect ? headerRect.bottom : panelRect.top;
-            const left = panelRect.left;
-            const width = panelRect.width;
-            const height = Math.max(150, panelRect.bottom - top);
+            let top = headerRect ? headerRect.bottom : panelRect.top;
+            let left = panelRect.left;
+            let width = panelRect.width;
+            let height = Math.max(150, panelRect.bottom - top);
+
+            // 保底宽度自适应升级（方案 A 核心）：
+            // 如果底层宿主面板宽度过窄（例如处于折叠/未展开状态，宽度 < 560px）：
+            // 绝不挤在窄条里，自动提升为至少 idealDrawerWidth 宽，且贴齐屏幕右边缘！
+            if (width < 560) {
+                width = Math.min(window.innerWidth - 200, idealDrawerWidth);
+                left = Math.round(window.innerWidth - width);
+                top = Math.max(38, Math.min(top, 38));
+                height = Math.max(200, window.innerHeight - top);
+                wrapper.style.borderRadius = '12px 0 0 12px';
+                wrapper.style.boxShadow = '-16px 0 48px rgba(0, 0, 0, 0.75)';
+            } else {
+                // 宿主面板宽大时：若右侧距离屏幕边缘小于 40px，吸附贴齐至屏幕最右端（消除微小缝隙并完整遮盖右侧文件树）
+                if (window.innerWidth - (left + width) < 40) {
+                    width = Math.round(window.innerWidth - left);
+                }
+                wrapper.style.borderRadius = panelInfo.isWorkspaceViewer ? '6px 0 0 6px' : '0';
+                wrapper.style.boxShadow = panelInfo.isWorkspaceViewer ? '-12px 0 40px rgba(0, 0, 0, 0.65)' : '0 12px 48px rgba(0, 0, 0, 0.7)';
+            }
 
             wrapper.style.top = `${Math.round(top)}px`;
             wrapper.style.left = `${Math.round(left)}px`;
             wrapper.style.width = `${Math.round(width)}px`;
             wrapper.style.height = `${Math.round(height)}px`;
-            wrapper.style.borderRadius = panelInfo.isWorkspaceViewer ? '6px 0 0 6px' : '0';
-            wrapper.style.borderLeft = panelInfo.isWorkspaceViewer ? '1px solid rgba(255, 255, 255, 0.16)' : '1px solid rgba(255, 255, 255, 0.12)';
-            wrapper.style.boxShadow = panelInfo.isWorkspaceViewer ? '-12px 0 40px rgba(0, 0, 0, 0.65)' : '0 12px 48px rgba(0, 0, 0, 0.7)';
+            wrapper.style.borderLeft = '1px solid rgba(255, 255, 255, 0.16)';
         } else {
             // 独立抽屉模式 (Drawer Mode)：右侧滑出 Pro 编辑器
             const top = 38;
-            const width = Math.min(880, Math.max(560, Math.round(window.innerWidth * 0.48)));
+            const width = idealDrawerWidth;
             const left = Math.round(window.innerWidth - width);
             const height = Math.max(200, window.innerHeight - top);
 
@@ -1147,7 +1218,7 @@ function mountInlineEditor(panelInfo, initialContent, targetLine = null) {
             wrapper.style.height = `${height}px`;
             wrapper.style.borderRadius = '12px 0 0 12px';
             wrapper.style.borderLeft = '1px solid rgba(255, 255, 255, 0.16)';
-            wrapper.style.boxShadow = '-12px 0 40px rgba(0, 0, 0, 0.65)';
+            wrapper.style.boxShadow = '-16px 0 48px rgba(0, 0, 0, 0.75)';
         }
     }
 
@@ -1784,22 +1855,7 @@ export async function openFileInEditor(targetPath, targetLine = null) {
     }
 
     // 从外部或对话选区打开文件：优先覆盖当前活动的工作区（包含代码查看器与文件树），营造独占专注编辑体验
-    let activeWorkspacePanel = null;
-    const treeSidebar = document.querySelector('[data-testid="tab-file-tree-sidebar"]');
-    const activeViewer = document.querySelector('.file-viewer-root');
-    if (activeViewer || treeSidebar) {
-        let probe = (activeViewer || treeSidebar).parentElement;
-        while (probe && probe !== document.body && probe !== document.documentElement) {
-            const rect = probe.getBoundingClientRect();
-            if (rect.width >= 300 && rect.height >= 200 && rect.left >= 200) {
-                if (probe.querySelector && (probe.querySelector('.file-viewer-root') || probe.querySelector('[data-testid="tab-file-tree-sidebar"]'))) {
-                    activeWorkspacePanel = probe;
-                    break;
-                }
-            }
-            probe = probe.parentElement;
-        }
-    }
+    const activeWorkspacePanel = findWorkspaceRootContainer();
 
     const panelInfo = {
         panel: activeWorkspacePanel,
