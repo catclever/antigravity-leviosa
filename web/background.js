@@ -158,8 +158,16 @@ export function initBackground() {
             .bg-muted .bg-muted,
             [data-testid="conversation-view"] .bg-muted,
             .bg-background [data-testid="conversation-view"],
-            .bg-muted [data-testid="conversation-view"] {
+            .bg-muted [data-testid="conversation-view"],
+            div:has(> [data-testid="home-greeting"]) .bg-background,
+            div:has(> [data-testid="home-greeting"]) .bg-muted,
+            .agy-sheet,
+            [class*="agy-sheet"],
+            .browser-hole-opaque,
+            .browser-hole-ancestor:not(.agy-shell) {
+                background: transparent !important;
                 background-color: transparent !important;
+                background-image: none !important;
                 backdrop-filter: none !important;
                 box-shadow: none !important;
             }
