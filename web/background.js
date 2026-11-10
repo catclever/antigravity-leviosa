@@ -164,7 +164,12 @@ export function initBackground() {
             .agy-sheet,
             [class*="agy-sheet"],
             .browser-hole-opaque,
-            .browser-hole-ancestor:not(.agy-shell) {
+            .browser-hole-ancestor:not(.agy-shell),
+            [data-main-content-body],
+            [data-main-content-header],
+            [data-split-root],
+            div[data-pane-id],
+            [data-testid="overview-panel-host"] {
                 background: transparent !important;
                 background-color: transparent !important;
                 background-image: none !important;
