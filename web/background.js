@@ -154,22 +154,47 @@ export function initBackground() {
             .bg-background .bg-background,
             .bg-muted .bg-background,
             [data-testid="conversation-view"] .bg-background,
+            [data-testid="subagent-tab-conversation"] .bg-background,
+            [data-side-panel-focus-scope] .bg-background,
             .bg-background .bg-muted,
             .bg-muted .bg-muted,
             [data-testid="conversation-view"] .bg-muted,
+            [data-testid="subagent-tab-conversation"] .bg-muted,
+            [data-side-panel-focus-scope] .bg-muted,
             .bg-background [data-testid="conversation-view"],
             .bg-muted [data-testid="conversation-view"],
+            .bg-background [data-testid="subagent-tab-conversation"],
+            .bg-muted [data-testid="subagent-tab-conversation"],
+            .bg-background [data-side-panel-focus-scope],
+            .bg-muted [data-side-panel-focus-scope],
             div:has(> [data-testid="home-greeting"]) .bg-background,
             div:has(> [data-testid="home-greeting"]) .bg-muted,
             .agy-sheet,
             [class*="agy-sheet"],
+            .agy-inset-shell,
             .browser-hole-opaque,
             .browser-hole-ancestor:not(.agy-shell),
             [data-main-content-body],
             [data-main-content-header],
             [data-split-root],
             div[data-pane-id],
-            [data-testid="overview-panel-host"] {
+            [data-testid="overview-panel-host"],
+            [data-side-panel-focus-scope],
+            [data-side-panel-focus-scope] > div,
+            [data-side-panel-focus-scope] .flex-grow,
+            [data-side-panel-focus-scope] .overflow-hidden,
+            [data-side-panel-focus-scope] .flex-grow.overflow-hidden,
+            [data-side-panel-focus-scope] [class*="flex-grow"],
+            [data-side-panel-focus-scope] [class*="overflow-hidden"],
+            [data-side-panel-focus-scope] div[role="region"],
+            [data-side-panel-focus-scope] [aria-label="Side Panel"],
+            [data-side-panel-focus-scope] [aria-label="Subagent Conversation header"],
+            #root [data-side-panel-focus-scope] .flex-grow.overflow-hidden,
+            #root [data-side-panel-focus-scope] > div.flex-grow,
+            [data-testid="subagent-tab-conversation"],
+            [data-testid="subagent-tab-sidebar"],
+            div[data-media-drop-scope="subpane"],
+            div[data-testid="aux-pane-split"] {
                 background: transparent !important;
                 background-color: transparent !important;
                 background-image: none !important;
@@ -182,6 +207,8 @@ export function initBackground() {
             .bg-background div[data-testid="comment-box"],
             .bg-muted div[data-testid="comment-box"],
             [data-testid="conversation-view"] div[data-testid="comment-box"],
+            [data-testid="subagent-tab-conversation"] div[data-testid="comment-box"],
+            [data-side-panel-focus-scope] div[data-testid="comment-box"],
             .bg-background .absolute.z-50.bg-muted,
             .bg-background .absolute.z-50.bg-background,
             .bg-muted .absolute.z-50.bg-muted,
@@ -191,7 +218,15 @@ export function initBackground() {
             [data-testid="conversation-view"] div.border.bg-muted,
             [data-testid="conversation-view"] div.rounded-xl.bg-muted,
             [data-testid="conversation-view"] div.rounded-lg.bg-muted,
-            [data-testid="conversation-view"] div.rounded-md.bg-muted {
+            [data-testid="conversation-view"] div.rounded-md.bg-muted,
+            [data-testid="subagent-tab-conversation"] div.border.bg-muted,
+            [data-testid="subagent-tab-conversation"] div.rounded-xl.bg-muted,
+            [data-testid="subagent-tab-conversation"] div.rounded-lg.bg-muted,
+            [data-testid="subagent-tab-conversation"] div.rounded-md.bg-muted,
+            [data-side-panel-focus-scope] div.border.bg-muted,
+            [data-side-panel-focus-scope] div.rounded-xl.bg-muted,
+            [data-side-panel-focus-scope] div.rounded-lg.bg-muted,
+            [data-side-panel-focus-scope] div.rounded-md.bg-muted {
                 background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 90%, transparent) !important;
                 backdrop-filter: blur(16px) !important;
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
@@ -228,6 +263,14 @@ export function initBackground() {
             #root [data-testid="conversation-view"] > div > div,
             #root [data-testid="conversation-view"] > div > div > div,
             #root [data-testid="conversation-view"] > div > div > div > div:not([data-testid="lifted-context-menu-trigger"]):not(.bg-card):not(.bg-secondary),
+            #root [data-testid="subagent-tab-conversation"] > div,
+            #root [data-testid="subagent-tab-conversation"] > div > div,
+            #root [data-testid="subagent-tab-conversation"] > div > div > div,
+            #root [data-testid="subagent-tab-conversation"] > div > div > div > div:not([data-testid="lifted-context-menu-trigger"]):not(.bg-card):not(.bg-secondary),
+            #root [data-side-panel-focus-scope] [data-testid="subagent-tab-conversation"] > div,
+            #root [data-side-panel-focus-scope] [data-testid="subagent-tab-conversation"] > div > div,
+            #root [data-side-panel-focus-scope] [data-testid="subagent-tab-conversation"] > div > div > div,
+            #root [data-side-panel-focus-scope] [data-testid="subagent-tab-conversation"] > div > div > div > div:not([data-testid="lifted-context-menu-trigger"]):not(.bg-card):not(.bg-secondary),
             .md-sticky-message-bleed::before,
             .md-sticky-message-bleed::after {
                 background: transparent !important;
@@ -244,12 +287,25 @@ export function initBackground() {
             [data-testid="conversation-view"] [class*="from-background"],
             [data-testid="conversation-view"] [class*="to-background"],
             [data-testid="conversation-view"] [class*="via-background"],
+            [data-testid="subagent-tab-conversation"] [class*="bg-gradient-to-t"],
+            [data-testid="subagent-tab-conversation"] [class*="bg-gradient-to-b"],
+            [data-testid="subagent-tab-conversation"] [class*="from-background"],
+            [data-testid="subagent-tab-conversation"] [class*="to-background"],
+            [data-testid="subagent-tab-conversation"] [class*="via-background"],
+            [data-side-panel-focus-scope] [class*="bg-gradient-to-t"],
+            [data-side-panel-focus-scope] [class*="bg-gradient-to-b"],
+            [data-side-panel-focus-scope] [class*="from-background"],
+            [data-side-panel-focus-scope] [class*="to-background"],
+            [data-side-panel-focus-scope] [class*="via-background"],
+            [data-side-panel-focus-scope] [style*="linear-gradient"],
             [data-testid="autoscroll-viewport"] [class*="from-background"],
             [data-testid="autoscroll-viewport"] [class*="to-background"],
             [data-testid="autoscroll-viewport"] [class*="bg-gradient"],
             div:has(> [data-testid="autoscroll-viewport"]) > [class*="gradient"],
             div:has(> [data-testid="autoscroll-viewport"]) > [class*="from-background"],
-            div:has(> [data-testid="autoscroll-viewport"]) [class*="pointer-events-none"][class*="bottom-0"] {
+            div:has(> [data-testid="autoscroll-viewport"]) [class*="pointer-events-none"][class*="bottom-0"],
+            [data-side-panel-focus-scope] [class*="pointer-events-none"][class*="bottom-0"],
+            [data-testid="subagent-tab-conversation"] [class*="pointer-events-none"][class*="bottom-0"] {
                 background: transparent !important;
                 background-color: transparent !important;
                 background-image: none !important;
@@ -262,6 +318,14 @@ export function initBackground() {
             [data-testid="conversation-view"] [class*="before:from-background"]::before,
             [data-testid="conversation-view"] [class*="after:bg-gradient"]::after,
             [data-testid="conversation-view"] [class*="before:bg-gradient"]::before,
+            [data-testid="subagent-tab-conversation"] [class*="after:from-background"]::after,
+            [data-testid="subagent-tab-conversation"] [class*="before:from-background"]::before,
+            [data-testid="subagent-tab-conversation"] [class*="after:bg-gradient"]::after,
+            [data-testid="subagent-tab-conversation"] [class*="before:bg-gradient"]::before,
+            [data-side-panel-focus-scope] [class*="after:from-background"]::after,
+            [data-side-panel-focus-scope] [class*="before:from-background"]::before,
+            [data-side-panel-focus-scope] [class*="after:bg-gradient"]::after,
+            [data-side-panel-focus-scope] [class*="before:bg-gradient"]::before,
             [data-testid="autoscroll-viewport"]::after,
             [data-testid="autoscroll-viewport"]::before,
             div:has(> [data-testid="autoscroll-viewport"])::after,
@@ -274,13 +338,19 @@ export function initBackground() {
             /* 3. 底部输入框/衔接区域的阴影、深色上边框与哨兵线消杀 */
             [data-testid="conversation-view"] div:has(> textarea),
             [data-testid="conversation-view"] div:has(> form),
+            [data-testid="subagent-tab-conversation"] div:has(> textarea),
+            [data-testid="subagent-tab-conversation"] div:has(> form),
+            [data-side-panel-focus-scope] div:has(> textarea),
+            [data-side-panel-focus-scope] div:has(> form),
             [data-testid="autoscroll-viewport"] ~ div,
             [data-testid="autoscroll-viewport"] + div {
                 box-shadow: none !important;
             }
 
             [data-testid="autoscroll-viewport"] div.h-px,
-            [data-testid="conversation-view"] div.h-px[aria-hidden="true"] {
+            [data-testid="conversation-view"] div.h-px[aria-hidden="true"],
+            [data-testid="subagent-tab-conversation"] div.h-px[aria-hidden="true"],
+            [data-side-panel-focus-scope] div.h-px[aria-hidden="true"] {
                 background-color: transparent !important;
                 border-color: transparent !important;
             }
@@ -338,7 +408,7 @@ export function initBackground() {
       (document.head || document.documentElement).appendChild(style);
     }
     style.textContent = css;
-    console.log("🎨 [Antigravity V4.4 反套娃版] 样式已注入！");
+    console.log("🎨 [Antigravity V4.5 反套娃+子代理侧栏适配版] 样式已注入！");
 
       // ============================================
       // 动态获取本地随机背景图
