@@ -182,8 +182,14 @@ export function initBackground() {
             /* === 3.4 侧边栏新建/总览面板：深色高透编辑器风格 (Editor-style Obsidian Frosted Glass) === */
             /* 满足公主对新建标签页/总览面板风格的要求：
                彻底复刻编辑器 (file_editor.js) 的极品质感：
-               深色暗调遮罩 (rgba(11, 14, 20)) + 视口同轴背景图映射 (var(--antigravity-bg)) + 24px 高级毛玻璃滤镜
-               并消除辅助分栏展开动画延迟 (transition: 0s) 避免 Chromium fixed 图层在动态展开阶段发生裁切黑边！ */
+               深色暗调遮罩 (rgba(11, 14, 20)) + 视口同轴背景图映射 (var(--antigravity-bg)) + 24px 高级毛玻璃滤镜。
+               
+               【核心避坑指南 (详见 kb/split_pane_transition_fixed_bg_clipping.md)】：
+               1. 故障机理：分栏组件自带 transition: width 500ms 展开动画与 overflow: hidden。在补间过程中，
+                  Chromium 合成器对 background-attachment: fixed 仅按首帧 min-width 边界分配固定尺寸瓦片 (x ≈ 478px)，
+                  导致展开至 694px 时右侧瓦片未光栅化，裸露底层黑色，必须刷新页面才能在静态满宽下自愈；
+               2. 根治策略：针对 aux-pane-split > div 强制应用 transition: none !important; transition-duration: 0s !important;，
+                  消除 500ms 动态展开中间态，使分栏就绪时首帧即达满宽，一劳永逸杜绝瓦片冻结裁切！ */
             #root [data-testid="aux-pane-split"] > div {
                 transition: none !important;
                 transition-duration: 0s !important;
@@ -674,6 +680,7 @@ export function initBackground() {
     });
 
     // 监听新建标签页/总览视图挂载，触发视口重新计算保证 fixed 背景图层瞬间满宽渲染
+    // 机制说明：配合 CSS 的 transition: 0s，在 DOM 挂载时刻主动派发 resize 与 rAF，驱动 Chromium 强制对齐视口合成图层
     const newTabObserver = new MutationObserver((mutations) => {
         for (const m of mutations) {
             for (const n of m.addedNodes) {
