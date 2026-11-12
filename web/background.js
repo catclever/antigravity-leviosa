@@ -162,12 +162,11 @@ export function initBackground() {
             /* === 3.2 浏览器组件轻透毛玻璃层 (Browser Chrome Frosted Glass) === */
             /* 满足公主对浏览器组件背景更通透磨砂感的要求：
                主区域保持 65% 深度磨砂以确保长文沉浸阅读；
-               浏览器组件导航条/地址栏与新建标签页采用更加轻灵透亮的 45% 主题色混合 + 12px 毛玻璃！
+               浏览器组件导航条/地址栏采用更加轻灵透亮的 45% 主题色混合 + 12px 毛玻璃！
                注：右侧顶部标签栏 ([data-side-panel-strip]) 属于顶栏 Titlebar，由 topbar_color.js 统一上色；
                真正的 Chromium 网页视口 ([data-browser-hole="true"]) 严密保持纯透明透传，确保网页内容真实无损。 */
             #root [data-testid="builtin-browser-pane"] > div:first-child,
-            #root div:has(> form[data-testid="browser-url-bar"]),
-            #root [data-testid="side-panel-new-tab-view"] {
+            #root div:has(> form[data-testid="browser-url-bar"]) {
                 background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 45%, transparent) !important;
                 backdrop-filter: blur(12px) !important;
                 -webkit-backdrop-filter: blur(12px) !important;
@@ -178,6 +177,59 @@ export function initBackground() {
             #root div[data-side-panel-strip] {
                 background-color: var(--topbar-bg-color, transparent) !important;
                 color: var(--topbar-text-color, inherit) !important;
+            }
+
+            /* === 3.4 侧边栏新建/总览面板：深色高透编辑器风格 (Editor-style Obsidian Frosted Glass) === */
+            /* 满足公主对新建标签页/总览面板风格的要求：
+               彻底复刻编辑器 (file_editor.js) 的极品质感：
+               深色暗调遮罩 (rgba(11, 14, 20)) + 视口同轴背景图映射 (var(--antigravity-bg)) + 24px 高级毛玻璃滤镜
+               并消除辅助分栏展开动画延迟 (transition: 0s) 避免 Chromium fixed 图层在动态展开阶段发生裁切黑边！ */
+            #root [data-testid="aux-pane-split"] > div {
+                transition: none !important;
+                transition-duration: 0s !important;
+            }
+
+            #root [data-side-panel-body="true"]:has([data-testid="side-panel-new-tab-view"]),
+            #root [data-side-panel-focus-scope] [data-side-panel-body="true"] {
+                background: transparent !important;
+                background-color: transparent !important;
+                background-image: none !important;
+            }
+
+            #root [data-testid="side-panel-new-tab-view"] {
+                background-image:
+                    linear-gradient(rgba(11, 14, 20, 0.60), rgba(11, 14, 20, 0.68)),
+                    var(--antigravity-bg, none) !important;
+                background-size: cover !important;
+                background-position: center !important;
+                background-repeat: no-repeat !important;
+                background-attachment: fixed !important;
+                background-color: transparent !important;
+                backdrop-filter: blur(24px) saturate(140%) !important;
+                -webkit-backdrop-filter: blur(24px) saturate(140%) !important;
+            }
+
+            #root [data-testid="side-panel-new-tab-view"] [data-testid="new-tab-search-input"] {
+                background-color: rgba(21, 25, 33, 0.50) !important;
+                border: 1px solid rgba(255, 255, 255, 0.12) !important;
+                backdrop-filter: blur(12px) !important;
+                -webkit-backdrop-filter: blur(12px) !important;
+                color: #f8fafc !important;
+                transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+
+            #root [data-testid="side-panel-new-tab-view"] [data-testid="new-tab-search-input"]::placeholder {
+                color: rgba(255, 255, 255, 0.45) !important;
+            }
+
+            #root [data-testid="side-panel-new-tab-view"] [data-testid="new-tab-search-input"]:focus {
+                background-color: rgba(21, 25, 33, 0.75) !important;
+                border-color: rgba(56, 189, 248, 0.60) !important;
+                box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.20) !important;
+            }
+
+            #root [data-testid="side-panel-new-tab-view"] button:hover {
+                background-color: rgba(255, 255, 255, 0.08) !important;
             }
 
             /* === 4. Anti-Stacking 反套娃机制 (彻底粉碎中间的叠加死黑) 💥 === */
@@ -226,14 +278,14 @@ export function initBackground() {
             [data-side-panel-focus-scope],
             [data-side-panel-focus-scope] > div,
             [data-side-panel-focus-scope] .flex-grow,
-            [data-side-panel-focus-scope] .overflow-hidden,
-            [data-side-panel-focus-scope] .flex-grow.overflow-hidden,
+            [data-side-panel-focus-scope] .overflow-hidden:not([data-testid="side-panel-new-tab-view"]),
+            [data-side-panel-focus-scope] .flex-grow.overflow-hidden:not([data-testid="side-panel-new-tab-view"]),
             [data-side-panel-focus-scope] [class*="flex-grow"],
-            [data-side-panel-focus-scope] [class*="overflow-hidden"],
+            [data-side-panel-focus-scope] [class*="overflow-hidden"]:not([data-testid="side-panel-new-tab-view"]),
             [data-side-panel-focus-scope] div[role="region"],
             [data-side-panel-focus-scope] [aria-label="Side Panel"],
             [data-side-panel-focus-scope] [aria-label="Subagent Conversation header"],
-            #root [data-side-panel-focus-scope] .flex-grow.overflow-hidden,
+            #root [data-side-panel-focus-scope] .flex-grow.overflow-hidden:not([data-testid="side-panel-new-tab-view"]),
             #root [data-side-panel-focus-scope] > div.flex-grow,
             [data-testid="subagent-tab-conversation"],
             [data-testid="subagent-tab-sidebar"],
@@ -617,6 +669,22 @@ export function initBackground() {
         syncSettingsBackground();
     });
     settingsObserver.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+
+    // 监听新建标签页/总览视图挂载，触发视口重新计算保证 fixed 背景图层瞬间满宽渲染
+    const newTabObserver = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+            for (const n of m.addedNodes) {
+                if (n.nodeType === 1 && (n.matches?.('[data-testid="side-panel-new-tab-view"]') || n.querySelector?.('[data-testid="side-panel-new-tab-view"]'))) {
+                    window.dispatchEvent(new Event('resize'));
+                    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+                }
+            }
+        }
+    });
+    newTabObserver.observe(document.body || document.documentElement, {
         childList: true,
         subtree: true
     });
