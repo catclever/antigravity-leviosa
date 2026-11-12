@@ -1592,9 +1592,9 @@ function ensureStylesInjected() {
         #leviosa-project-perm-popover {
             position: fixed;
             z-index: 999999;
-            width: 420px;
+            width: 480px;
             max-width: calc(100vw - 24px);
-            max-height: min(560px, calc(100vh - 48px));
+            max-height: min(620px, calc(100vh - 48px));
             display: flex;
             flex-direction: column;
             border-radius: 14px;
@@ -2440,10 +2440,10 @@ function bindPermissionControlEvents(containerEl, projConfig, isEmbeddedCard, al
             <div style="font-size:11.5px;font-weight:600;color:#cbd5e1;">
                 已拒绝合并的父目录（${rejectedList.length}）：
             </div>
-            <div style="display:flex;flex-direction:column;gap:5px;max-height:160px;overflow-y:auto;">
+            <div style="display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto;">
                 ${rejectedList.map((dirPath, rIdx) => `
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:6px;background:rgba(15,23,42,0.68);border:1px solid rgba(255,255,255,0.08);">
-                        <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:#e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;" title="${escapeHtml(dirPath)}">${escapeHtml(dirPath)}</span>
+                        <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:#e2e8f0;word-break:break-all;line-height:1.35;min-width:0;flex:1;user-select:text;" title="${escapeHtml(dirPath)}">${escapeHtml(dirPath)}</span>
                         <button type="button" data-action="restore-rejected-dir" data-rejected-idx="${rIdx}" style="padding:2px 8px;border-radius:5px;background:rgba(16,185,129,0.16);border:1px solid rgba(16,185,129,0.34);color:#6ee7b7;font-size:10.5px;font-weight:500;cursor:pointer;flex-shrink:0;white-space:nowrap;">恢复</button>
                     </div>
                 `).join('')}
@@ -2512,31 +2512,64 @@ function bindPermissionControlEvents(containerEl, projConfig, isEmbeddedCard, al
             <div style="font-size:11.5px;font-weight:600;color:#a7f3d0;">
                 🪄 检测到 ${candidateGroups.length} 组可合并父路径：
             </div>
-            <div style="display:flex;flex-direction:column;gap:6px;max-height:175px;overflow-y:auto;">
+            <div style="display:flex;flex-direction:column;gap:7px;max-height:260px;overflow-y:auto;padding-right:2px;">
                 ${candidateGroups.map((group, gIdx) => {
                     const pillCss = getModePillCss(group.mode);
                     const sym = getModeSymbol(group.mode);
                     const bareSources = group.sourceRules.map(sr => unwrapGrantRule(sr).bareTarget);
                     return `
-                    <div style="display:flex;flex-direction:column;gap:4px;padding:6px 8px;border-radius:6px;background:rgba(15,23,42,0.68);border:1px solid rgba(255,255,255,0.09);">
-                        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
-                            <label style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;cursor:pointer;">
-                                <input type="checkbox" data-merge-check="${gIdx}" checked style="cursor:pointer;accent-color:#10b981;flex-shrink:0;" />
-                                <span class="leviosa-perm-action-pill" style="${pillCss}">${sym} ${escapeHtml(group.shortAction)}</span>
-                                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;font-weight:600;color:#f8fafc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(group.targetPath)}">${escapeHtml(group.targetPath)}</span>
+                    <div style="display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:7px;background:rgba(15,23,42,0.75);border:1px solid rgba(255,255,255,0.09);">
+                        <!-- Row 1: Controls, Action Pill, and Group Info -->
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;min-width:0;flex:1;">
+                                <input type="checkbox" data-merge-check="${gIdx}" checked style="cursor:pointer;accent-color:#10b981;flex-shrink:0;width:14px;height:14px;" />
+                                <span class="leviosa-perm-action-pill" style="${pillCss};flex-shrink:0;">${sym} ${escapeHtml(group.shortAction)}</span>
+                                <span style="font-size:11px;color:#a7f3d0;font-weight:600;white-space:nowrap;">合并为公共父路径：</span>
                             </label>
-                            <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
-                                <span style="font-size:10px;color:#94a3b8;white-space:nowrap;">(${group.sourceRules.length} -> 1)</span>
-                                <button type="button" class="leviosa-perm-muted-icon-btn" data-action="reject-merge-group" data-group-idx="${gIdx}" title="屏蔽此父目录（后续不再提示合并到此层级）" aria-label="屏蔽此父目录">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                                <span style="font-size:10px;color:#94a3b8;font-weight:500;">(${group.sourceRules.length} 条子规则 → 1)</span>
+                                <button type="button" class="leviosa-perm-muted-icon-btn" data-action="reject-merge-group" data-group-idx="${gIdx}" title="屏蔽此父目录（后续不再提示合并到此层级）" aria-label="屏蔽此父目录" style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;">
                                         <circle cx="12" cy="12" r="9"></circle>
                                         <line x1="5.7" y1="5.7" x2="18.3" y2="18.3"></line>
                                     </svg>
                                 </button>
                             </div>
                         </div>
-                        <div style="display:flex;flex-direction:column;gap:2px;padding-left:22px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;color:#94a3b8;">
-                            ${bareSources.map(bs => `<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(bs)}">↳ ${escapeHtml(bs)}</div>`).join('')}
+
+                        <!-- Row 2: Target Merged Parent Path (Full-width distinct callout, wrapped, no truncation) -->
+                        <div style="display:flex;align-items:flex-start;gap:6px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.28);border-radius:6px;padding:6px 9px;">
+                            <span style="font-size:12px;line-height:1.4;flex-shrink:0;">📁</span>
+                            <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;font-weight:600;color:#34d399;word-break:break-all;line-height:1.4;user-select:text;" title="${escapeHtml(group.targetPath)}">${escapeHtml(group.targetPath)}</span>
+                        </div>
+
+                        <!-- Row 3: Child Source Paths (Distinct, non-truncated list with common prefix dimming and subpath highlighting!) -->
+                        <div style="display:flex;flex-direction:column;gap:3px;padding:2px 0 2px 4px;">
+                            <div style="font-size:10px;color:#94a3b8;font-weight:500;padding-left:2px;">↳ 包含以下 ${bareSources.length} 项子路径：</div>
+                            <div style="display:flex;flex-direction:column;gap:3px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;">
+                                ${bareSources.map(bs => {
+                                    let renderedPath = '';
+                                    const targetBaseWithSlash = group.targetPath.endsWith('/') ? group.targetPath : (group.targetPath + '/');
+                                    const targetBaseNoSlash = group.targetPath.endsWith('/') ? group.targetPath.slice(0, -1) : group.targetPath;
+
+                                    if (bs.startsWith(targetBaseWithSlash)) {
+                                        const sub = bs.slice(targetBaseWithSlash.length);
+                                        renderedPath = `<span style="color:#64748b;">${escapeHtml(targetBaseWithSlash)}</span><span style="color:#f8fafc;font-weight:600;background:rgba(255,255,255,0.06);padding:1px 3px;border-radius:3px;">${escapeHtml(sub)}</span>`;
+                                    } else if (bs.startsWith(targetBaseNoSlash)) {
+                                        const sub = bs.slice(targetBaseNoSlash.length);
+                                        renderedPath = `<span style="color:#64748b;">${escapeHtml(targetBaseNoSlash)}</span><span style="color:#f8fafc;font-weight:600;background:rgba(255,255,255,0.06);padding:1px 3px;border-radius:3px;">${escapeHtml(sub)}</span>`;
+                                    } else {
+                                        renderedPath = `<span style="color:#cbd5e1;">${escapeHtml(bs)}</span>`;
+                                    }
+
+                                    return `
+                                    <div style="display:flex;align-items:flex-start;gap:5px;word-break:break-all;line-height:1.35;white-space:normal;padding:3px 6px;border-radius:4px;background:rgba(15,23,42,0.5);border:1px solid rgba(255,255,255,0.04);" title="${escapeHtml(bs)}">
+                                        <span style="color:#10b981;flex-shrink:0;user-select:none;font-weight:bold;">•</span>
+                                        <span style="user-select:text;flex:1;min-width:0;">${renderedPath}</span>
+                                    </div>
+                                    `;
+                                }).join('')}
+                            </div>
                         </div>
                     </div>
                     `;
