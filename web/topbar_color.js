@@ -38,6 +38,8 @@ export function initTopbar() {
             div.flex.justify-between:has([data-testid="install-editor"]),
             div.border-b:has(button[data-tab-id="overview"]),
             div[data-active-tab-id],
+            div[data-side-panel-strip],
+            [data-side-panel-strip],
             header, [data-test-id="chat-header"], .top-bar-class,
             div:has(> button[data-testid="close-aux-pane"])
         ) {
@@ -67,6 +69,8 @@ export function initTopbar() {
             div.flex.justify-between:has([data-testid="install-editor"]),
             div.border-b:has(button[data-tab-id="overview"]),
             div[data-active-tab-id],
+            div[data-side-panel-strip],
+            [data-side-panel-strip],
             header, [data-test-id="chat-header"], .top-bar-class,
             div:has(> button[data-testid="close-aux-pane"])
         ) *:not(#ag-dummy-bump-specificity):not([data-testid="app-update-button"]):not([data-testid="app-update-button"] *) {

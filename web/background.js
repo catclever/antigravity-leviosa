@@ -159,19 +159,25 @@ export function initBackground() {
                 -webkit-backdrop-filter: blur(12px) !important;
             }
 
-            /* === 3.2 浏览器组件与右侧面板轻透毛玻璃层 (Browser Chrome Frosted Glass) === */
+            /* === 3.2 浏览器组件轻透毛玻璃层 (Browser Chrome Frosted Glass) === */
             /* 满足公主对浏览器组件背景更通透磨砂感的要求：
                主区域保持 65% 深度磨砂以确保长文沉浸阅读；
-               浏览器组件头部（标签栏、地址栏/导航条、新建标签页）采用更加轻灵透亮的 45% 主题色混合 + 12px 毛玻璃！
+               浏览器组件导航条/地址栏与新建标签页采用更加轻灵透亮的 45% 主题色混合 + 12px 毛玻璃！
+               注：右侧顶部标签栏 ([data-side-panel-strip]) 属于顶栏 Titlebar，由 topbar_color.js 统一上色；
                真正的 Chromium 网页视口 ([data-browser-hole="true"]) 严密保持纯透明透传，确保网页内容真实无损。 */
-            #root [data-side-panel-strip],
-            #root div[data-side-panel-strip][data-active-tab-id],
             #root [data-testid="builtin-browser-pane"] > div:first-child,
             #root div:has(> form[data-testid="browser-url-bar"]),
             #root [data-testid="side-panel-new-tab-view"] {
                 background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 45%, transparent) !important;
                 backdrop-filter: blur(12px) !important;
                 -webkit-backdrop-filter: blur(12px) !important;
+            }
+
+            /* === 3.3 右侧辅助面板/浏览器标签栏跟随全局顶栏统一着色 === */
+            #root [data-side-panel-strip],
+            #root div[data-side-panel-strip] {
+                background-color: var(--topbar-bg-color, transparent) !important;
+                color: var(--topbar-text-color, inherit) !important;
             }
 
             /* === 4. Anti-Stacking 反套娃机制 (彻底粉碎中间的叠加死黑) 💥 === */
