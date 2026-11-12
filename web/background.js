@@ -159,6 +159,21 @@ export function initBackground() {
                 -webkit-backdrop-filter: blur(12px) !important;
             }
 
+            /* === 3.2 浏览器组件与右侧面板轻透毛玻璃层 (Browser Chrome Frosted Glass) === */
+            /* 满足公主对浏览器组件背景更通透磨砂感的要求：
+               主区域保持 65% 深度磨砂以确保长文沉浸阅读；
+               浏览器组件头部（标签栏、地址栏/导航条、新建标签页）采用更加轻灵透亮的 45% 主题色混合 + 12px 毛玻璃！
+               真正的 Chromium 网页视口 ([data-browser-hole="true"]) 严密保持纯透明透传，确保网页内容真实无损。 */
+            #root [data-side-panel-strip],
+            #root div[data-side-panel-strip][data-active-tab-id],
+            #root [data-testid="builtin-browser-pane"] > div:first-child,
+            #root div:has(> form[data-testid="browser-url-bar"]),
+            #root [data-testid="side-panel-new-tab-view"] {
+                background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 45%, transparent) !important;
+                backdrop-filter: blur(12px) !important;
+                -webkit-backdrop-filter: blur(12px) !important;
+            }
+
             /* === 4. Anti-Stacking 反套娃机制 (彻底粉碎中间的叠加死黑) 💥 === */
             /* 这是核心魔法：凡是嵌套在背景容器里的次级背景容器，全部强行扒光！
                这意味着无论中间聊天区里套娃了多少层 div，磨砂滤镜永远只会应用在最外层那一次！ */
@@ -217,7 +232,10 @@ export function initBackground() {
             [data-testid="subagent-tab-conversation"],
             [data-testid="subagent-tab-sidebar"],
             div[data-media-drop-scope="subpane"],
-            div[data-testid="aux-pane-split"] {
+            div[data-testid="aux-pane-split"],
+            [data-testid="builtin-browser-placeholder"],
+            [data-browser-hole="true"],
+            div:has(> [data-testid="builtin-browser-placeholder"]) {
                 background: transparent !important;
                 background-color: transparent !important;
                 background-image: none !important;
