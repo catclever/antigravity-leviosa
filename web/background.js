@@ -148,6 +148,17 @@ export function initBackground() {
                 background-image: none !important;
             }
 
+            /* === 3.1 浏览器打孔时主聊天区独立毛玻璃层 (Web Browser Hole Compensation) === */
+            /* 当右侧开启网页 (browser-hole) 时，Antigravity 会给 body 和 .browser-hole-ancestor (.agy-shell) 注入
+               data-has-browser-hole="true"，并原生将其强制透明化以透出 Chromium 网页底图。
+               此时必须由最外层 .browser-hole-opaque 独家接管主聊天区，提供 65% 主题色与 12px 毛玻璃！ */
+            body[data-has-browser-hole="true"] .browser-hole-opaque:not(.browser-hole-opaque *):not([data-has-browser-hole="true"]),
+            [data-has-browser-hole="true"] .browser-hole-opaque:not(.browser-hole-opaque *):not([data-has-browser-hole="true"]) {
+                background-color: color-mix(in srgb, var(${THEME_VAR}, ${DEFAULT_COLOR}) 65%, transparent) !important;
+                backdrop-filter: blur(12px) !important;
+                -webkit-backdrop-filter: blur(12px) !important;
+            }
+
             /* === 4. Anti-Stacking 反套娃机制 (彻底粉碎中间的叠加死黑) 💥 === */
             /* 这是核心魔法：凡是嵌套在背景容器里的次级背景容器，全部强行扒光！
                这意味着无论中间聊天区里套娃了多少层 div，磨砂滤镜永远只会应用在最外层那一次！ */
@@ -172,7 +183,19 @@ export function initBackground() {
             .agy-sheet,
             [class*="agy-sheet"],
             .agy-inset-shell,
-            .browser-hole-opaque,
+            body:not([data-has-browser-hole="true"]) .browser-hole-opaque,
+            .browser-hole-opaque .browser-hole-opaque,
+            body[data-has-browser-hole="true"] .browser-hole-opaque .browser-hole-opaque,
+            body[data-has-browser-hole="true"] .browser-hole-opaque [data-main-content-body],
+            body[data-has-browser-hole="true"] .browser-hole-opaque [data-main-content-header],
+            body[data-has-browser-hole="true"] .browser-hole-opaque [data-testid="conversation-view"],
+            body[data-has-browser-hole="true"] [data-split-panes] .agy-sheet[data-sheet-inset] :is([data-tiling-pane], [data-tiling-pane] > [data-pane-id]):not([data-has-browser-hole="true"]),
+            body[data-has-browser-hole="true"] [data-split-panes] .agy-sheet[data-sheet-inset] [data-tiling-pane] > [data-pane-id] > :first-child,
+            body[data-has-browser-hole="true"] .agy-sheet[data-sheet-inset] :is([data-main-content-body], [data-side-panel-body]),
+            body[data-has-browser-hole="true"] .agy-inset-shell > [data-split-root] > [data-split-sash],
+            body[data-has-browser-hole="true"] [data-split-sash],
+            body[data-has-browser-hole="true"] [data-pane-id]:not([data-has-browser-hole="true"]),
+            body[data-has-browser-hole="true"] .browser-hole-ancestor[data-has-browser-hole="true"] > :not([data-has-browser-hole="true"], [data-browser-hole]:not([data-browser-hole="false"]), .absolute, .fixed),
             .browser-hole-ancestor:not(.agy-shell),
             [data-main-content-body],
             [data-main-content-header],
