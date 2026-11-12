@@ -1879,6 +1879,16 @@ function ensureStylesInjected() {
             border-color: rgba(245, 158, 11, 0.80) !important;
             color: #fef08a !important;
         }
+        .leviosa-conv-to-project-perm-btn [data-action="deactivate-shield"] {
+            border-radius: 4px;
+            padding: 1px 4px !important;
+            transition: all 0.15s ease;
+        }
+        .leviosa-conv-to-project-perm-btn [data-action="deactivate-shield"]:hover {
+            background: rgba(245, 158, 11, 0.35);
+            color: #ffffff !important;
+            opacity: 1 !important;
+        }
     `;
     if (style.textContent !== cssText) {
         style.textContent = cssText;
@@ -3232,6 +3242,28 @@ function findPermissionPromptCardRoot(radioGroupEl) {
     return radioGroupEl?.parentElement || null;
 }
 
+function triggerPermissionSubmit(radioGroupEl) {
+    const cardRoot = findPermissionPromptCardRoot(radioGroupEl);
+    let submitBtn = cardRoot ? cardRoot.querySelector('[data-testid="interaction-continue-button"]') : null;
+    if (!submitBtn) {
+        let ancestor = radioGroupEl.parentElement;
+        while (ancestor && ancestor !== document.body) {
+            submitBtn = ancestor.querySelector('[data-testid="interaction-continue-button"]');
+            if (!submitBtn) {
+                const buttons = Array.from(ancestor.querySelectorAll('button'));
+                submitBtn = buttons.find(b => (b.textContent || '').trim().includes('Submit'));
+            }
+            if (submitBtn) break;
+            ancestor = ancestor.parentElement;
+        }
+    }
+    if (submitBtn && !submitBtn.disabled) {
+        submitBtn.click();
+        return true;
+    }
+    return false;
+}
+
 function maintainPermissionPromptButtons() {
     ensureStylesInjected();
 
@@ -3253,7 +3285,7 @@ function maintainPermissionPromptButtons() {
             </svg>
             <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:12px;">Always in this project</span>
         </div>
-        <span data-action="deactivate-shield" style="font-size:13px;opacity:0.75;padding:0 2px;line-height:1;margin-left:4px;flex-shrink:0;cursor:pointer;" title="取消项目级别授权（恢复仅当前会话）">✕</span>
+        <span data-action="deactivate-shield" style="font-size:13px;opacity:0.8;line-height:1;margin-left:4px;flex-shrink:0;cursor:pointer;" title="收起并取消项目授权（恢复仅当前会话）">✕</span>
     `;
 
     radioGroups.forEach(radioGroupEl => {
@@ -3408,7 +3440,7 @@ function maintainPermissionPromptButtons() {
                 targetLabel.classList.remove('leviosa-conv-label-full');
                 targetLabel.classList.add('leviosa-conv-label-collapsed');
                 shieldBtn.innerHTML = shieldActiveInnerHtml;
-                const tooltipText = `已启用：提交时将同时加入 [${projConfig.name}] 项目权限（点击取消）`;
+                const tooltipText = `已启用项目授权：再次点击直接确认提交（点击右侧 ✕ 取消）`;
                 shieldBtn.title = tooltipText;
                 shieldBtn.setAttribute('aria-label', tooltipText);
             } else {
@@ -3438,25 +3470,43 @@ function maintainPermissionPromptButtons() {
                 e.preventDefault();
                 e.stopPropagation();
 
+                const isDeactivateClick = Boolean(
+                    e.target && typeof e.target.closest === 'function' && e.target.closest('[data-action="deactivate-shield"]')
+                );
                 const wasActive = shieldBtn.getAttribute('data-active') === 'true';
-                const nextActive = !wasActive;
 
-                if (nextActive) {
+                if (wasActive) {
+                    if (isDeactivateClick) {
+                        // 收起必须点击 x
+                        setMorphState(false);
+                    } else {
+                        // 第二次点击就是确认！
+                        const radio = targetLabel.querySelector('input[type="radio"]');
+                        if (radio && !radio.checked) {
+                            targetLabel.click();
+                        }
+                        setTimeout(() => {
+                            triggerPermissionSubmit(radioGroupEl);
+                        }, 30);
+                    }
+                } else {
+                    // 第一次点击开启展开
                     const radio = targetLabel.querySelector('input[type="radio"]');
                     if (radio && !radio.checked) {
                         targetLabel.click();
                     }
                     setMorphState(true);
-                } else {
-                    setMorphState(false);
                 }
             });
 
-            // If user clicks the collapsed option label directly, toggle shield off back to full conversation option
+            // If user clicks the collapsed option label directly when shield is active, also treat as confirm rather than collapsing
             targetLabel.addEventListener('click', (e) => {
                 if (!e.isTrusted) return;
                 if (shieldBtn && shieldBtn.getAttribute('data-active') === 'true') {
-                    setMorphState(false);
+                    // 第二次点击也是确认提交，绝不收起（收起必须点击 x）
+                    setTimeout(() => {
+                        triggerPermissionSubmit(radioGroupEl);
+                    }, 30);
                 }
             });
 
@@ -3558,7 +3608,13 @@ function maintainPermissionPromptButtons() {
             };
 
             cardRoot.addEventListener('click', (ev) => {
-                if (ev.target && typeof ev.target.closest === 'function' && ev.target.closest('[data-testid="interaction-continue-button"]')) {
+                const isSubmit = Boolean(
+                    ev.target && typeof ev.target.closest === 'function' && (
+                        ev.target.closest('[data-testid="interaction-continue-button"]') ||
+                        (ev.target.closest('button') && (ev.target.closest('button').textContent || '').trim().includes('Submit'))
+                    )
+                );
+                if (isSubmit) {
                     executeProjectPermSaveOnSubmit();
                 }
             }, true);
