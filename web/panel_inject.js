@@ -3,6 +3,16 @@
  */
 import { extractActiveProjectName } from './project_opener.js';
 
+function escapeAttr(val) {
+    if (val === undefined || val === null) return '';
+    return String(val)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 export function initPanelInject() {
     const API_BASE = 'http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/pm_dashboard_api';
 
@@ -10,6 +20,114 @@ export function initPanelInject() {
     let wrapper = null;
     let panel = null; 
     let animationFrameId = null;
+    let cachedReactNavigate = null;
+
+    function getCurrentConversationUuid() {
+        const match = window.location.pathname.match(/\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+        return match ? match[1].toLowerCase() : null;
+    }
+
+    function tryReactNavigate(targetPath) {
+        if (typeof cachedReactNavigate === 'function') {
+            try {
+                cachedReactNavigate(targetPath);
+                return true;
+            } catch (e) {
+                cachedReactNavigate = null;
+            }
+        }
+
+        const candidateNodes = [
+            document.querySelector('[data-testid="new-conversation-button"]'),
+            document.querySelector('[data-testid="history-button"]'),
+            document.querySelector('nav a[href^="/"]'),
+            document.querySelector('aside a[href^="/"]'),
+            document.querySelector('#root')
+        ].filter(Boolean);
+
+        for (const node of candidateNodes) {
+            const fiberKey = Object.keys(node).find(k => k.startsWith('__reactFiber$'));
+            if (!fiberKey) continue;
+
+            let curr = node[fiberKey];
+            let depth = 0;
+            while (curr && depth < 35) {
+                if (curr.memoizedProps) {
+                    const props = curr.memoizedProps;
+                    if (typeof props.navigate === 'function') {
+                        cachedReactNavigate = props.navigate;
+                        try { cachedReactNavigate(targetPath); return true; } catch (e) {}
+                    }
+                    if (props.router && typeof props.router.navigate === 'function') {
+                        cachedReactNavigate = (p) => props.router.navigate(p);
+                        try { cachedReactNavigate(targetPath); return true; } catch (e) {}
+                    }
+                    if (props.value && props.value.navigator && typeof props.value.navigator.push === 'function') {
+                        cachedReactNavigate = (p) => props.value.navigator.push(p);
+                        try { cachedReactNavigate(targetPath); return true; } catch (e) {}
+                    }
+                }
+
+                if (curr.memoizedState) {
+                    let stateNode = curr.memoizedState;
+                    let hookDepth = 0;
+                    while (stateNode && hookDepth < 15) {
+                        if (stateNode.memoizedState) {
+                            const ms = stateNode.memoizedState;
+                            if (typeof ms === 'function') {
+                                if (ms.name === 'navigate' || ms.toString().includes('navigate') || ms.toString().includes('dispatch')) {
+                                    try {
+                                        ms(targetPath);
+                                        cachedReactNavigate = ms;
+                                        return true;
+                                    } catch (e) {}
+                                }
+                            } else if (Array.isArray(ms) && ms.length > 1 && Array.isArray(ms[1])) {
+                                for (const dep of ms[1]) {
+                                    if (typeof dep === 'function') {
+                                        try {
+                                            dep(targetPath);
+                                            cachedReactNavigate = dep;
+                                            return true;
+                                        } catch (e) {}
+                                    }
+                                }
+                            }
+                        }
+                        stateNode = stateNode.next;
+                        hookDepth++;
+                    }
+                }
+
+                if (curr.dependencies && curr.dependencies.firstContext) {
+                    let ctx = curr.dependencies.firstContext;
+                    while (ctx) {
+                        const val = ctx.memoizedValue;
+                        if (val) {
+                            if (typeof val.navigate === 'function') {
+                                cachedReactNavigate = val.navigate;
+                                try { cachedReactNavigate(targetPath); return true; } catch (e) {}
+                            }
+                            if (val.navigator && typeof val.navigator.push === 'function') {
+                                cachedReactNavigate = (p) => val.navigator.push(p);
+                                try { cachedReactNavigate(targetPath); return true; } catch (e) {}
+                            }
+                            if (val.router && typeof val.router.navigate === 'function') {
+                                cachedReactNavigate = (p) => val.router.navigate(p);
+                                try { cachedReactNavigate(targetPath); return true; } catch (e) {}
+                            }
+                        }
+                        ctx = ctx.next;
+                    }
+                }
+
+                curr = curr.return;
+                depth++;
+            }
+        }
+
+        return false;
+    }
 
     function getCurrentProjectName() {
         let proj = extractActiveProjectName();
@@ -20,9 +138,12 @@ export function initPanelInject() {
                                     || document.querySelector('div[role="button"].bg-secondary, button.bg-secondary, .group.bg-secondary');
             
             if (activeSidebarRow) {
-                const rowDom = activeSidebarRow.closest('div[role="button"], button, a, .group');
+                const rowDom = activeSidebarRow.closest('div[role="button"], button, a, .group, [data-testid="conversation-row-sidebar"]');
                 if (rowDom) {
-                    const projectSpan = rowDom.querySelector('.text-xs.text-muted-foreground, .text-\\[10px\\]');
+                    const subtext = rowDom.getAttribute('data-subtext');
+                    if (subtext && subtext.trim()) return subtext.trim();
+
+                    const projectSpan = rowDom.querySelector('.text-sm.text-muted-foreground, .text-xs.text-muted-foreground, .text-\\[10px\\]');
                     if (projectSpan && projectSpan.textContent) {
                         return projectSpan.textContent.trim();
                     }
@@ -32,6 +153,50 @@ export function initPanelInject() {
 
         return null;
     }
+
+    function ensureStyles() {
+        if (document.getElementById('leviosa-pm-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'leviosa-pm-styles';
+        style.textContent = `
+            #leviosa-pm-btn,
+            #leviosa-pm-btn * {
+                -webkit-app-region: no-drag !important;
+                app-region: no-drag !important;
+                cursor: pointer !important;
+            }
+            #leviosa-pm-wrapper,
+            #leviosa-pm-panel,
+            #leviosa-pm-panel * {
+                -webkit-app-region: no-drag !important;
+                app-region: no-drag !important;
+            }
+            .leviosa-session-current-badge {
+                background-color: rgba(14, 165, 233, 0.20);
+                color: rgb(125, 211, 252);
+                border: 1px solid rgba(56, 189, 248, 0.40);
+            }
+            .leviosa-session-jump-btn {
+                background-color: rgba(99, 102, 241, 0.15);
+                color: rgb(165, 180, 252);
+                border: 1px solid rgba(129, 140, 248, 0.30);
+                transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+            }
+            .leviosa-session-jump-btn:hover {
+                background-color: rgba(99, 102, 241, 0.30);
+                border-color: rgba(129, 140, 248, 0.50);
+                color: rgb(199, 210, 254);
+            }
+            .leviosa-session-cold-pill {
+                background-color: rgba(255, 255, 255, 0.04);
+                color: rgba(156, 163, 175, 0.78);
+                border: 1px solid rgba(255, 255, 255, 0.10);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    ensureStyles();
 
     const observer = new MutationObserver(() => {
         const searchBtn = document.querySelector('[data-testid="sidebar-search-button"]');
@@ -43,14 +208,21 @@ export function initPanelInject() {
     observer.observe(document.body, { childList: true, subtree: true });
 
     function injectButton(searchBtn) {
+        ensureStyles();
         const pmBtn = document.createElement('button');
         pmBtn.id = 'leviosa-pm-btn';
+        pmBtn.type = 'button';
         pmBtn.className = searchBtn.className;
         pmBtn.setAttribute('aria-label', 'Project Dashboard');
+        pmBtn.setAttribute('data-no-drag', '');
+        pmBtn.style.setProperty('-webkit-app-region', 'no-drag', 'important');
+        pmBtn.style.setProperty('app-region', 'no-drag', 'important');
+        pmBtn.style.cursor = 'pointer';
+        pmBtn.style.pointerEvents = 'auto';
         pmBtn.innerHTML = `
-            <span class="relative flex items-center justify-center" style="width: 18px; height: 18px;">
-                <span class="absolute inset-0 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <span class="relative flex items-center justify-center pointer-events-none" style="width: 18px; height: 18px; -webkit-app-region: no-drag; app-region: no-drag;">
+                <span class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <svg class="pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                         <line x1="3" y1="9" x2="21" y2="9"></line>
                         <line x1="9" y1="21" x2="9" y2="9"></line>
@@ -61,6 +233,7 @@ export function initPanelInject() {
 
         searchBtn.parentNode.insertBefore(pmBtn, searchBtn.nextSibling);
         pmBtn.addEventListener('click', (e) => {
+            e.preventDefault();
             e.stopPropagation();
             togglePanel();
         });
@@ -237,6 +410,57 @@ export function initPanelInject() {
         }
     }
 
+    window.leviosaJumpToSession = function(convoId) {
+        if (!convoId) return;
+
+        // 1. 平滑收起看板面板
+        if (isOpen) {
+            togglePanel();
+        }
+
+        const targetPath = '/c/' + convoId;
+        if (window.location.pathname === targetPath) {
+            return;
+        }
+
+        // Tier 1: 直接调度 Antigravity 宿主 TanStack Router 实例 (无刷新 SPA 路由跳转，绝不修改 window.location.href)
+        if (window.__TSR_ROUTER__ && typeof window.__TSR_ROUTER__.navigate === 'function') {
+            try {
+                window.__TSR_ROUTER__.navigate({ to: targetPath });
+                setTimeout(() => {
+                    const sidebarItem = document.querySelector(`.bg-sidebar a[href="${targetPath}"], a[href="${targetPath}"]`);
+                    if (sidebarItem && !sidebarItem.closest('#leviosa-pm-panel') && !sidebarItem.closest('#leviosa-history-view')) {
+                        sidebarItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                }, 80);
+                return;
+            } catch (err) {
+                console.warn('[PanelInject] TanStack Router navigation failed, trying fallbacks:', err);
+            }
+        }
+
+        // Tier 2: 侧边栏原生 DOM 链接代理点击降级
+        const sidebarMatch = document.querySelector(`.bg-sidebar a[href="${targetPath}"], a[href="${targetPath}"]`);
+        if (sidebarMatch && !sidebarMatch.closest('#leviosa-pm-panel') && !sidebarMatch.closest('#leviosa-history-view')) {
+            sidebarMatch.click();
+            sidebarMatch.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+        }
+
+        // Tier 3: React Fiber navigate 逆向调度
+        if (tryReactNavigate(targetPath)) {
+            return;
+        }
+
+        // Tier 4: HTML5 pushState + popstate 终极兜底
+        try {
+            window.history.pushState(null, '', targetPath);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+        } catch (e) {
+            console.warn('[PanelInject] popstate dispatch failed:', e);
+        }
+    };
+
     window.leviosaCompleteTask = async function(taskId) {
         const currentProject = getCurrentProjectName();
         if(!currentProject) return;
@@ -368,6 +592,10 @@ export function initPanelInject() {
 
     function renderKanban(tasks, contentNode, tasksPath) {
         window.leviosaTasksCache = tasks;
+        const currentConvoUuid = getCurrentConversationUuid();
+        const isCurrentSessionTask = (t) => Boolean(currentConvoUuid && t.session && t.session.toLowerCase() === currentConvoUuid);
+        const priorityRank = (p) => (p === 'high' ? 3 : p === 'medium' ? 2 : 1);
+
         const backlogStates = ['backlog', 'todo', 'pending', 'open'];
         const completedStates = ['completed', 'done', 'closed', 'resolved'];
         
@@ -375,8 +603,21 @@ export function initPanelInject() {
         const completed = tasks.filter(t => completedStates.includes(t.status));
         const active = tasks.filter(t => !backlogStates.includes(t.status) && !completedStates.includes(t.status));
 
-        // 已经完成的任务：按照完成时间倒序排列 (最新完成排在最前)
+        // 当前打开对话所关联的任务置顶，同层级内保持原有优先级或完成时间倒序
+        const sortByCurrentSessionThenPriority = (a, b) => {
+            const currDiff = Number(isCurrentSessionTask(b)) - Number(isCurrentSessionTask(a));
+            if (currDiff !== 0) return currDiff;
+            const prioDiff = priorityRank(b.priority) - priorityRank(a.priority);
+            if (prioDiff !== 0) return prioDiff;
+            return 0;
+        };
+
+        backlog.sort(sortByCurrentSessionThenPriority);
+        active.sort(sortByCurrentSessionThenPriority);
+
         completed.sort((a, b) => {
+            const currDiff = Number(isCurrentSessionTask(b)) - Number(isCurrentSessionTask(a));
+            if (currDiff !== 0) return currDiff;
             const timeA = a.completedAt || a.mtimeMs || 0;
             const timeB = b.completedAt || b.mtimeMs || 0;
             if (timeA !== timeB) return timeB - timeA;
@@ -388,6 +629,8 @@ export function initPanelInject() {
                 return `<div class="text-center py-6 text-xs text-muted-foreground/60 border border-dashed border-white/10 rounded-xl bg-white/[0.02]">Empty</div>`;
             }
             return taskList.map(t => {
+                const isCurrSession = isCurrentSessionTask(t);
+
                 // 优先级映射：提取颜色与语义，兼顾卡片左边框高亮线与卡片内发光圆点，防止Tailwind类未预编译丢失
                 let prioColor = '#60a5fa'; // low / default
                 let prioLabel = 'LOW';
@@ -409,21 +652,48 @@ export function initPanelInject() {
                 if (columnType === 'active') {
                     // Active 栏反转视觉层级：栏位轻透，卡片本身为深色磨砂玻璃，悬浮感突出
                     containerClass += ' hover:brightness-110 hover:border-blue-400/40';
-                    cardStyle = `background-color: rgba(16, 20, 28, 0.78); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255, 255, 255, 0.14); border-left: 3.5px solid ${prioColor} !important; box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 0 16px rgba(59, 130, 246, 0.08);`;
+                    if (isCurrSession) {
+                        cardStyle = `background-color: rgba(18, 28, 42, 0.86); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(56, 189, 248, 0.50); border-left: 3.5px solid ${prioColor} !important; box-shadow: 0 0 0 1.5px rgba(56, 189, 248, 0.75), 0 8px 28px -4px rgba(14, 165, 233, 0.28) !important;`;
+                    } else {
+                        cardStyle = `background-color: rgba(16, 20, 28, 0.78); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255, 255, 255, 0.14); border-left: 3.5px solid ${prioColor} !important; box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 0 16px rgba(59, 130, 246, 0.08);`;
+                    }
                 } else if (columnType === 'completed') {
-                    // Completed 栏：由高度磨砂底栏托底，卡片自身高透，略带暗淡
-                    containerClass += ' opacity-75 hover:opacity-100 hover:bg-white/[0.08]';
-                    cardStyle = `background-color: rgba(255, 255, 255, 0.04); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3.5px solid ${prioColor} !important;`;
+                    // Completed 栏：由高度磨砂底栏托底，卡片自身高透，略带暗淡 (当前对话聚光灯卡片保持清晰高亮)
+                    if (isCurrSession) {
+                        containerClass += ' hover:opacity-100 hover:bg-white/[0.10]';
+                        cardStyle = `background-color: rgba(14, 165, 233, 0.09); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(56, 189, 248, 0.45); border-left: 3.5px solid ${prioColor} !important; box-shadow: 0 0 0 1.5px rgba(56, 189, 248, 0.75), 0 8px 28px -4px rgba(14, 165, 233, 0.28) !important;`;
+                    } else {
+                        containerClass += ' opacity-75 hover:opacity-100 hover:bg-white/[0.08]';
+                        cardStyle = `background-color: rgba(255, 255, 255, 0.04); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3.5px solid ${prioColor} !important;`;
+                    }
                 } else {
                     // Backlog 栏：由高度磨砂底栏托底，卡片自身高透
                     containerClass += ' hover:bg-white/[0.08]';
-                    cardStyle = `background-color: rgba(255, 255, 255, 0.04); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3.5px solid ${prioColor} !important;`;
+                    if (isCurrSession) {
+                        cardStyle = `background-color: rgba(14, 165, 233, 0.09); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(56, 189, 248, 0.45); border-left: 3.5px solid ${prioColor} !important; box-shadow: 0 0 0 1.5px rgba(56, 189, 248, 0.75), 0 8px 28px -4px rgba(14, 165, 233, 0.28) !important;`;
+                    } else {
+                        cardStyle = `background-color: rgba(255, 255, 255, 0.04); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3.5px solid ${prioColor} !important;`;
+                    }
                 }
 
                 let badgeColor = 'bg-white/10 text-foreground border border-white/10';
                 if (t.status === 'in_review') badgeColor = 'bg-purple-500/20 text-purple-300 border border-purple-500/30';
                 else if (t.status === 'active' || t.status === 'in_progress') badgeColor = 'bg-blue-500/20 text-blue-300 border border-blue-500/30';
                 else if (columnType === 'completed') badgeColor = 'bg-green-500/20 text-green-300 border border-green-500/30';
+
+                let sessionPillHtml = '';
+                if (isCurrSession) {
+                    sessionPillHtml = `<span onclick="event.stopPropagation()" title="当前打开的对话关联任务" class="leviosa-session-current-badge text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-400/40 font-medium inline-flex items-center gap-1">📍 当前对话</span>`;
+                } else if (t.session) {
+                    const sessionTitleText = escapeAttr(t.sessionInfo?.sessionTitle || t.session);
+                    if (t.sessionInfo?.deepArchived) {
+                        sessionPillHtml = `<span onclick="event.stopPropagation()" title="关联会话已深归档冷备: ${sessionTitleText}" class="leviosa-session-cold-pill text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-muted-foreground/75 border border-white/10 inline-flex items-center gap-1 cursor-default">☁️ 已冷备</span>`;
+                    } else if (t.sessionInfo?.existsInDb !== false) {
+                        const jumpLabel = t.sessionInfo?.archived ? '📦 跳转归档' : '💬 跳转对话';
+                        const safeSessionId = escapeAttr(t.session);
+                        sessionPillHtml = `<button type="button" onclick="event.stopPropagation(); window.leviosaJumpToSession('${safeSessionId}')" title="跳转到对话: ${sessionTitleText}" class="leviosa-session-jump-btn text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/15 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-400/30 transition-colors cursor-pointer inline-flex items-center gap-1">${jumpLabel}</button>`;
+                    }
+                }
 
                 const tagsHtml = t.tags.map(tag => `<span class="text-[10px] px-1.5 py-0.5 border border-white/10 rounded text-muted-foreground/80 bg-white/[0.03]">${tag}</span>`).join('');
                 
@@ -493,7 +763,7 @@ export function initPanelInject() {
                             </div>
                         </div>
                         <h4 class="text-sm font-semibold mb-2 text-foreground/90 leading-tight">${t.title}</h4>
-                        <div class="flex items-center gap-1 flex-wrap">${tagsHtml}${completionTimeHtml}</div>
+                        <div class="flex items-center gap-1 flex-wrap">${sessionPillHtml}${tagsHtml}${completionTimeHtml}</div>
                         ${actionBtn}
                         ${startBtn}
                     </div>`;

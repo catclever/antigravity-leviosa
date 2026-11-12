@@ -1,12 +1,21 @@
-const { execSync } = require('child_process');
+const { execSync, execFileSync, execFile } = require('child_process');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
 
+function isValidUuid(id) {
+    return typeof id === 'string' && /^[a-f0-9][a-f0-9\-]{3,63}$/i.test(id) && id.includes('-');
+}
+
 function formatRelativeTime(dateStr) {
     if (!dateStr) return '';
     try {
-        const utcDate = new Date(dateStr.replace(' ', 'T') + 'Z');
+        const normalized = String(dateStr).trim();
+        const isoStr = normalized.includes('T')
+            ? (/[zZ]|[+\-]\d{2}:?\d{2}$/.test(normalized) ? normalized : normalized + 'Z')
+            : normalized.replace(' ', 'T') + 'Z';
+        const utcDate = new Date(isoStr);
+        if (isNaN(utcDate.getTime())) return '';
         const diffMs = Date.now() - utcDate.getTime();
         const diffSec = Math.floor(diffMs / 1000);
         
@@ -21,6 +30,17 @@ function formatRelativeTime(dateStr) {
         return `${diffMonths}mo`;
     } catch (e) {
         return '';
+    }
+}
+
+function formatIsoToSqliteUtc(isoStr) {
+    if (!isoStr) return '1970-01-01 00:00:00';
+    try {
+        const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return '1970-01-01 00:00:00';
+        return d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '').replace(/Z$/, '');
+    } catch (e) {
+        return '1970-01-01 00:00:00';
     }
 }
 
@@ -60,6 +80,34 @@ function deriveConversationTitle(title, preview) {
     return firstLine.slice(0, 45) || 'Untitled Conversation';
 }
 
+function runArchiveJsonAsync(scriptPath, args) {
+    return new Promise((resolve) => {
+        execFile(process.execPath, [scriptPath, ...args], {
+            env: process.env,
+            maxBuffer: 10 * 1024 * 1024,
+            timeout: 610000
+        }, (error, stdout, stderr) => {
+            const trimmed = (stdout || '').trim();
+            if (trimmed) {
+                try {
+                    resolve(JSON.parse(trimmed));
+                    return;
+                } catch (e) {
+                    if (!error) {
+                        resolve({ success: false, error: 'Failed to parse agy_archive JSON output', output: stdout, stderr });
+                        return;
+                    }
+                }
+            }
+            if (error) {
+                resolve({ success: false, error: error.message, stderr });
+            } else {
+                resolve({ success: false, error: 'Empty output from agy_archive.js', stderr });
+            }
+        });
+    });
+}
+
 module.exports = async function(query) {
     const action = query.action || 'list';
     const filter = query.filter || 'all'; // 'all', 'active', 'archived'
@@ -67,26 +115,122 @@ module.exports = async function(query) {
     const groupBy = query.groupBy || 'project'; // 'project' or 'none'
     const includeSubagents = query.includeSubagents === 'true';
 
-    const dbPath = path.join(os.homedir(), '.gemini/antigravity/conversation_summaries.db');
+    const workspaceRoot = process.env.AGY_WORKSPACE_ROOT || path.join(os.homedir(), '.gemini/antigravity');
+    const dbPath = path.join(workspaceRoot, 'conversation_summaries.db');
+    const archiveScriptPath = process.env.AGY_ARCHIVE_SCRIPT_PATH || path.join(__dirname, '..', 'web', 'agy_archive.js');
+    const archivesIndexPath = process.env.AGY_ARCHIVES_INDEX || (
+        process.env.AGY_ARCHIVES_DIR
+            ? path.join(process.env.AGY_ARCHIVES_DIR, 'archive_index.json')
+            : path.join(__dirname, '..', 'web', 'archives', 'archive_index.json')
+    );
+
+    if (action === 'restore_deep') {
+        const uuid = query.uuid ? decodeURIComponent(query.uuid) : '';
+        if (!uuid) return { success: false, error: 'Missing uuid' };
+        if (!/^[a-f0-9\-]+$/i.test(uuid)) return { success: false, error: 'Invalid uuid format' };
+        if (!fs.existsSync(archiveScriptPath)) {
+            return { success: false, error: `Archive script not found at ${archiveScriptPath}` };
+        }
+        const res = await runArchiveJsonAsync(archiveScriptPath, ['restore', uuid, '--json']);
+        return { action: 'restore_deep', ...res };
+    }
+
+    if (action === 'get_storage_config') {
+        if (!fs.existsSync(archiveScriptPath)) {
+            return { success: false, error: `Archive script not found at ${archiveScriptPath}` };
+        }
+        const res = await runArchiveJsonAsync(archiveScriptPath, ['config', '--json']);
+        return { action: 'get_storage_config', ...res };
+    }
+
+    if (action === 'set_storage_config') {
+        if (!fs.existsSync(archiveScriptPath)) {
+            return { success: false, error: `Archive script not found at ${archiveScriptPath}` };
+        }
+        const rcloneDest = query.rcloneDest !== undefined ? decodeURIComponent(query.rcloneDest) : '';
+        const pveHost = query.pveHost !== undefined ? decodeURIComponent(query.pveHost) : '';
+        const enabled = query.enabled !== undefined ? (query.enabled === 'true' || query.enabled === true) : Boolean(rcloneDest);
+        const args = ['config', 'set', rcloneDest, pveHost, String(enabled), '--json'];
+        const res = await runArchiveJsonAsync(archiveScriptPath, args);
+        return { action: 'set_storage_config', ...res };
+    }
+
+    if (action === 'offload_archives') {
+        if (!fs.existsSync(archiveScriptPath)) {
+            return { success: false, error: `Archive script not found at ${archiveScriptPath}` };
+        }
+        const uuid = query.uuid ? decodeURIComponent(query.uuid) : '';
+        const offloadAll = query.all === true || query.all === 'true' || !uuid || uuid === '--all';
+        if (!offloadAll && !/^[a-f0-9\-]+$/i.test(uuid)) {
+            return { success: false, error: 'Invalid uuid format' };
+        }
+        const args = offloadAll ? ['offload', '--all', '--json'] : ['offload', uuid, '--json'];
+        const res = await runArchiveJsonAsync(archiveScriptPath, args);
+        return { action: 'offload_archives', ...res };
+    }
+
+    if (action === 'auto_lifecycle') {
+        if (!fs.existsSync(archiveScriptPath)) {
+            return { success: false, error: `Archive script not found at ${archiveScriptPath}` };
+        }
+        const args = ['lifecycle', '--json'];
+        if (query.dryRun === 'true' || query.dryRun === true) {
+            args.push('--dry-run');
+        }
+        if (query.force === 'true' || query.force === true) {
+            args.push('--force');
+        }
+        if (query.noAutoOffload === 'true' || query.noAutoOffload === true) {
+            args.push('--no-auto-offload');
+        }
+        if (query.shallowDays !== undefined && query.shallowDays !== '' && !isNaN(Number(query.shallowDays))) {
+            args.push('--shallow-days', String(Number(query.shallowDays)));
+        }
+        if (query.deepDays !== undefined && query.deepDays !== '' && !isNaN(Number(query.deepDays))) {
+            args.push('--deep-days', String(Number(query.deepDays)));
+        }
+        if (query.currentUuid && /^[a-f0-9\-]+$/i.test(String(query.currentUuid))) {
+            args.push('--current-uuid', String(query.currentUuid));
+        }
+        const res = await runArchiveJsonAsync(archiveScriptPath, args);
+        return { action: 'auto_lifecycle', ...res };
+    }
+
     if (!fs.existsSync(dbPath)) {
         return { success: false, error: 'Database conversation_summaries.db not found' };
     }
 
+    /*
+     * [Bug Fix Document - Task 073]
+     * 1. Problem: Previously, `action === 'list'` returned early (`{ total: 0, groups: [], items: [] }`)
+     *    whenever SQLite returned 0 rows (e.g. `filter === 'archived'` when all archived items had been
+     *    deep-archived and purged from SQLite), and never surfaced cold-archived conversations stored in
+     *    `archive_index.json` / `alist:115`.
+     * 2. Method:
+     *    - Query `allDbUuidSet` across `conversation_summaries` so we know definitively which indexed
+     *      deep archives are no longer in SQLite (`coldArchived: true`).
+     *    - Do not return early on empty SQLite output; when `filter === 'all' || filter === 'archived'`,
+     *      merge cold-archived records from `archivesIndexPath`, apply search filtering, and sort all items
+     *      and project groups chronologically descending by `lastModTime`.
+     * 3. Caveat:
+     *    - Validate every key in `archive_index.json` with `isValidUuid` before merging so non-UUID keys
+     *      (if ever introduced) can never pollute conversation lists.
+     */
     if (action === 'list') {
         try {
             let sql = `
                 SELECT 
                     cs.conversation_id, 
-                    cs.title, 
-                    cs.status, 
-                    cs.not_fully_idle, 
-                    cs.workspace_uris, 
+                    REPLACE(REPLACE(COALESCE(cs.title, ''), '|', ' '), CHAR(10), ' ') as clean_title, 
+                    COALESCE(cs.status, '') as status, 
+                    COALESCE(CAST(cs.not_fully_idle AS TEXT), '0') as not_fully_idle, 
+                    REPLACE(COALESCE(cs.workspace_uris, ''), '|', ' ') as workspace_uris, 
                     datetime(cs.last_modified_time) as last_mod,
                     COALESCE(fts.archived, 0) as archived,
-                    REPLACE(REPLACE(SUBSTR(cs.preview, 1, 120), '|', ' '), CHAR(10), ' ') as clean_preview
+                    REPLACE(REPLACE(SUBSTR(COALESCE(cs.preview, ''), 1, 120), '|', ' '), CHAR(10), ' ') as clean_preview
                 FROM conversation_summaries cs
                 LEFT JOIN (
-                    SELECT conversation_id, MAX(archived) as archived 
+                    SELECT conversation_id, MAX(CAST(archived AS INTEGER)) as archived 
                     FROM conversations_fts 
                     GROUP BY conversation_id
                 ) fts ON cs.conversation_id = fts.conversation_id
@@ -110,7 +254,7 @@ module.exports = async function(query) {
 
             if (search) {
                 const escapedSearch = search.replace(/'/g, "''");
-                whereClauses.push(`(cs.title LIKE '%${escapedSearch}%' OR cs.workspace_uris LIKE '%${escapedSearch}%')`);
+                whereClauses.push(`(cs.title LIKE '%${escapedSearch}%' OR cs.workspace_uris LIKE '%${escapedSearch}%' OR cs.conversation_id LIKE '%${escapedSearch}%')`);
             }
 
             if (whereClauses.length > 0) {
@@ -119,54 +263,156 @@ module.exports = async function(query) {
 
             sql += ' ORDER BY cs.last_modified_time DESC;';
 
-            // Query SQLite
-            const output = execSync(`sqlite3 "${dbPath}" "${sql}"`, {
+            // Query SQLite safely via execFileSync (no shell interpolation)
+            const output = execFileSync('sqlite3', [dbPath, sql], {
                 encoding: 'utf-8',
-                stdio: ['pipe', 'pipe', 'ignore'],
+                stdio: ['ignore', 'pipe', 'ignore'],
                 maxBuffer: 10 * 1024 * 1024
             }).trim();
 
-            if (!output) {
-                return { success: true, total: 0, groups: [], items: [] };
-            }
+            // Query complete set of UUIDs present in conversation_summaries to distinguish cold-purged items
+            const allDbUuidSet = new Set();
+            try {
+                const allIdsRaw = execFileSync('sqlite3', [dbPath, 'SELECT conversation_id FROM conversation_summaries;'], {
+                    encoding: 'utf-8',
+                    stdio: ['ignore', 'pipe', 'ignore'],
+                    maxBuffer: 10 * 1024 * 1024
+                }).trim();
+                if (allIdsRaw) {
+                    for (const rawId of allIdsRaw.split(/\r?\n/)) {
+                        const cleanId = rawId.trim();
+                        if (cleanId) allDbUuidSet.add(cleanId.toLowerCase());
+                    }
+                }
+            } catch (e) {}
 
-            const lines = output.split('\n');
             const projectMap = new Map();
             const allItems = [];
             let totalCount = 0;
+            let totalColdArchived = 0;
 
-            for (const line of lines) {
-                if (!line.trim()) continue;
-                const parts = line.split('|');
-                if (parts.length < 7) continue;
+            if (output) {
+                const lines = output.split(/\r?\n/);
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    const parts = line.split('|');
+                    if (parts.length < 7) continue;
 
-                const [conversation_id, rawTitle, status, not_fully_idle, workspace_uris, last_mod, archived, clean_preview] = parts;
-                const projectName = extractProjectName(workspace_uris);
-                const isRunning = status === 'CASCADE_RUN_STATUS_RUNNING' || not_fully_idle === '1';
-                const isArchived = archived === '1';
-                const finalTitle = deriveConversationTitle(rawTitle, clean_preview);
+                    const [conversation_id, rawTitle, status, not_fully_idle, workspace_uris, last_mod, archived, clean_preview] = parts;
+                    const projectName = extractProjectName(workspace_uris);
+                    const isRunning = status === 'CASCADE_RUN_STATUS_RUNNING' || not_fully_idle === '1';
+                    const isArchived = String(archived).trim() === '1';
+                    const finalTitle = deriveConversationTitle(rawTitle, clean_preview);
 
-                const item = {
-                    id: conversation_id,
-                    title: finalTitle,
-                    project: projectName,
-                    isRunning: isRunning,
-                    archived: isArchived,
-                    lastModTime: last_mod,
-                    relativeTime: formatRelativeTime(last_mod)
-                };
-
-                allItems.push(item);
-
-                if (!projectMap.has(projectName)) {
-                    projectMap.set(projectName, {
+                    const item = {
+                        id: conversation_id,
+                        title: finalTitle,
                         project: projectName,
-                        latestTime: last_mod,
-                        conversations: []
-                    });
+                        isRunning: isRunning,
+                        archived: isArchived,
+                        coldArchived: false,
+                        localEvicted: false,
+                        lastModTime: last_mod,
+                        relativeTime: formatRelativeTime(last_mod)
+                    };
+
+                    allItems.push(item);
+
+                    if (!projectMap.has(projectName)) {
+                        projectMap.set(projectName, {
+                            project: projectName,
+                            latestTime: last_mod,
+                            conversations: []
+                        });
+                    }
+                    projectMap.get(projectName).conversations.push(item);
+                    totalCount++;
                 }
-                projectMap.get(projectName).conversations.push(item);
-                totalCount++;
+            }
+
+            // Merge cold-archived conversations from archive_index.json when filter === 'all' || filter === 'archived'
+            if ((filter === 'all' || filter === 'archived') && fs.existsSync(archivesIndexPath)) {
+                try {
+                    const archiveIndex = JSON.parse(fs.readFileSync(archivesIndexPath, 'utf-8'));
+                    if (archiveIndex && typeof archiveIndex === 'object') {
+                        const searchLower = search ? search.toLowerCase() : '';
+                        for (const [uuid, entry] of Object.entries(archiveIndex)) {
+                            if (!isValidUuid(uuid)) continue;
+                            if (!entry || typeof entry !== 'object' || !entry.deepArchive) continue;
+                            if (allDbUuidSet.has(uuid.toLowerCase())) continue;
+
+                            const rawTitle = (entry.title && entry.title !== 'Unknown Title' && entry.title !== 'Unknown')
+                                ? String(entry.title).trim()
+                                : (entry.sqliteMeta && entry.sqliteMeta.title ? String(entry.sqliteMeta.title).trim() : '');
+                            const title = rawTitle || ('Cold Archive (' + uuid.slice(0, 8) + ')');
+
+                            const project = (entry.project && entry.project !== 'Unknown Project' && entry.project !== 'Unknown')
+                                ? String(entry.project).trim()
+                                : (entry.sqliteMeta && entry.sqliteMeta.workspace_uris
+                                    ? extractProjectName(entry.sqliteMeta.workspace_uris)
+                                    : 'General');
+
+                            if (searchLower) {
+                                const hit = title.toLowerCase().includes(searchLower)
+                                    || project.toLowerCase().includes(searchLower)
+                                    || uuid.toLowerCase().includes(searchLower);
+                                if (!hit) continue;
+                            }
+
+                            const lastMod = formatIsoToSqliteUtc(entry.deepArchive.timestamp);
+                            const localEvicted = Boolean(entry.deepArchive.localEvicted);
+                            const coldItem = {
+                                id: uuid,
+                                title,
+                                project,
+                                isRunning: false,
+                                archived: true,
+                                coldArchived: true,
+                                localEvicted,
+                                storage: entry.deepArchive.storage || (localEvicted ? 'cloud' : 'local'),
+                                sizeBytes: entry.deepArchive.sizeBytes || 0,
+                                lastModTime: lastMod,
+                                relativeTime: formatRelativeTime(lastMod)
+                            };
+
+                            allItems.push(coldItem);
+
+                            if (!projectMap.has(project)) {
+                                projectMap.set(project, {
+                                    project,
+                                    latestTime: lastMod,
+                                    conversations: []
+                                });
+                            }
+                            projectMap.get(project).conversations.push(coldItem);
+                            totalCount++;
+                            totalColdArchived++;
+                        }
+                    }
+                } catch (e) {
+                    // Non-fatal if archive_index.json is temporarily unreadable
+                }
+            }
+
+            if (allItems.length === 0) {
+                return {
+                    success: true,
+                    total: 0,
+                    totalColdArchived: 0,
+                    totalSubagents: 0,
+                    groupBy,
+                    groups: [],
+                    items: []
+                };
+            }
+
+            // Sort merged items & project groups chronologically descending by lastModTime
+            allItems.sort((a, b) => String(b.lastModTime || '').localeCompare(String(a.lastModTime || '')));
+            for (const g of projectMap.values()) {
+                g.conversations.sort((a, b) => String(b.lastModTime || '').localeCompare(String(a.lastModTime || '')));
+                if (g.conversations.length > 0) {
+                    g.latestTime = g.conversations[0].lastModTime;
+                }
             }
 
             // 统计各项目的 Subagent / CLI 自动化任务会话数量
@@ -176,16 +422,16 @@ module.exports = async function(query) {
                 const subagentSql = `
                     SELECT cs.workspace_uris, COUNT(*) as cnt
                     FROM conversation_summaries cs
-                    WHERE (cs.source = 'CORTEX_TRAJECTORY_SOURCE_CLI' OR cs.nesting_depth > 0 OR (cs.parent_conversation_id IS NOT NULL AND cs.parent_conversation_id != ''))
+                    WHERE (cs.source = 'CORTEX_TRAJECTORY_SOURCE_CLI' OR cs.nesting_depth > 0 OR (cs.parent_conversation_id IS NOT NULL AND parent_conversation_id != ''))
                     GROUP BY cs.workspace_uris;
                 `;
-                const subagentOutput = execSync(`sqlite3 "${dbPath}" "${subagentSql}"`, {
+                const subagentOutput = execFileSync('sqlite3', [dbPath, subagentSql], {
                     encoding: 'utf-8',
-                    stdio: ['pipe', 'pipe', 'ignore']
+                    stdio: ['ignore', 'pipe', 'ignore']
                 }).trim();
 
                 if (subagentOutput) {
-                    for (const row of subagentOutput.split('\n')) {
+                    for (const row of subagentOutput.split(/\r?\n/)) {
                         if (!row.trim()) continue;
                         const [uris, cntStr] = row.split('|');
                         const pName = extractProjectName(uris);
@@ -196,17 +442,20 @@ module.exports = async function(query) {
                 }
             } catch (e) {}
 
-            const groups = Array.from(projectMap.values()).map(g => ({
-                project: g.project,
-                count: g.conversations.length,
-                subagentCount: subagentCountsByProject.get(g.project) || 0,
-                latestTime: g.latestTime,
-                conversations: g.conversations
-            }));
+            const groups = Array.from(projectMap.values())
+                .map(g => ({
+                    project: g.project,
+                    count: g.conversations.length,
+                    subagentCount: subagentCountsByProject.get(g.project) || 0,
+                    latestTime: g.latestTime,
+                    conversations: g.conversations
+                }))
+                .sort((a, b) => String(b.latestTime || '').localeCompare(String(a.latestTime || '')));
 
             return {
                 success: true,
                 total: totalCount,
+                totalColdArchived,
                 totalSubagents: totalSubagentsCount,
                 groupBy,
                 groups,
@@ -221,22 +470,39 @@ module.exports = async function(query) {
     if (action === 'archive' || action === 'unarchive') {
         const uuid = query.uuid;
         if (!uuid) return { success: false, error: 'Missing uuid' };
+        if (!/^[a-f0-9\-]+$/i.test(uuid)) return { success: false, error: 'Invalid uuid format' };
         const newArchivedVal = action === 'archive' ? '1' : '0';
         try {
-            // 更新 FTS 搜索表中的归档标记
-            const updateSql = `UPDATE conversations_fts SET archived = '${newArchivedVal}' WHERE conversation_id = '${uuid}';`;
-            execSync(`sqlite3 "${dbPath}" "${updateSql}"`, { stdio: ['pipe', 'pipe', 'ignore'] });
+            const escapedUuid = uuid.replace(/'/g, "''");
+            const cntOut = execFileSync('sqlite3', [dbPath, `SELECT COUNT(*) FROM conversations_fts WHERE conversation_id = '${escapedUuid}';`], {
+                encoding: 'utf-8',
+                stdio: ['ignore', 'pipe', 'ignore']
+            }).trim();
+            const rowCount = parseInt(cntOut, 10) || 0;
+
+            if (rowCount > 0) {
+                const updateSql = `UPDATE conversations_fts SET archived = '${newArchivedVal}' WHERE conversation_id = '${escapedUuid}';`;
+                execFileSync('sqlite3', [dbPath, updateSql], { stdio: ['ignore', 'pipe', 'ignore'] });
+            } else {
+                const nowUtc = new Date().toISOString().replace('T', ' ').replace(/\.\d+Z$/, '').replace(/Z$/, '');
+                const escapedTitle = String(query.title || '').replace(/'/g, "''");
+                const escapedProject = String(query.project || '').replace(/'/g, "''");
+                const insertSql = `INSERT INTO conversations_fts (conversation_id, chunk_index, chunk_first_step, chunk_last_step, last_modified_time, step_count, last_step_created_at, archived, user_step_byte_offsets, agent_step_byte_offsets, title, workspace, project, user_body, agent_body) VALUES ('${escapedUuid}', 0, 0, 1, '${nowUtc}', 1, '${nowUtc}', '${newArchivedVal}', '', '', '${escapedTitle}', '', '${escapedProject}', '', '');`;
+                execFileSync('sqlite3', [dbPath, insertSql], { stdio: ['ignore', 'pipe', 'ignore'] });
+            }
 
             // 若执行归档，顺便触发 brain 的浅层压缩清理与 archive_index.json 同步
             if (action === 'archive') {
                 const title = query.title || '';
                 const project = query.project || '';
                 try {
-                    const scriptPath = path.join(__dirname, '..', 'web', 'agy_archive.js');
-                    if (fs.existsSync(scriptPath)) {
+                    if (fs.existsSync(archiveScriptPath)) {
                         const titleB64 = Buffer.from(title).toString('base64');
                         const projectB64 = Buffer.from(project).toString('base64');
-                        execSync(`node "${scriptPath}" clean --shallow ${uuid} "${titleB64}" "${projectB64}"`, { stdio: ['pipe', 'pipe', 'ignore'] });
+                        execFileSync(process.execPath, [archiveScriptPath, 'clean', '--shallow', uuid, titleB64, projectB64], {
+                            env: process.env,
+                            stdio: ['pipe', 'pipe', 'ignore']
+                        });
                     }
                 } catch (e) {
                     console.warn('[Archive] shallow clean warning:', e.message);
@@ -249,30 +515,50 @@ module.exports = async function(query) {
         }
     }
 
+    /*
+     * [Bug Fix Document]
+     * 1. Problem: Previously, `action === 'delete'` in History View invoked `agy_archive.js clean --deep`
+     *    without `--purge-parent` (and swallowed failures), leaving behind orphaned `brain/<uuid>`,
+     *    `conversations/<uuid>.pb`, spawned subagents, `/tmp` task execution logs, remote `Antigravity`
+     *    SQLite rows, and un-offloaded local deep tarballs.
+     * 2. Method: Invoke `agy_archive.js clean --deep <uuid> "<titleB64>" "<projectB64>" --purge-parent`
+     *    so History View deletion atomically packages the deep tarball, cascades cleanup across all
+     *    descendant subagents + `.pb` + `brain/` + `/tmp` logs + local/remote SQLite, and spawns
+     *    background auto-offload to `alist:115`.
+     * 3. Caveat: If `agy_archive.js` fails while archiving existing local parent files (e.g. disk full),
+     *    `delete` aborts and returns `{ success: false }` rather than deleting SQLite rows without backup.
+     */
     if (action === 'delete') {
         const uuid = query.uuid;
         if (!uuid) return { success: false, error: 'Missing uuid' };
+        if (!/^[a-f0-9\-]+$/i.test(uuid)) return { success: false, error: 'Invalid uuid format' };
         try {
-            // 1. 删除前执行深层归档备份，确保脑目录数据被 tarball 安全归档保存，不会永久丢失
             const title = query.title || '';
             const project = query.project || '';
-            try {
-                const scriptPath = path.join(__dirname, '..', 'web', 'agy_archive.js');
-                if (fs.existsSync(scriptPath)) {
-                    const titleB64 = Buffer.from(title).toString('base64');
-                    const projectB64 = Buffer.from(project).toString('base64');
-                    execSync(`node "${scriptPath}" clean --deep ${uuid} "${titleB64}" "${projectB64}"`, { stdio: ['pipe', 'pipe', 'ignore'] });
-                }
-            } catch (e) {
-                console.warn('[Delete] deep archive backup warning:', e.message);
+            if (!fs.existsSync(archiveScriptPath)) {
+                return { success: false, error: `Archive script not found at ${archiveScriptPath}` };
             }
 
-            // 2. 从官方 SQLite 数据库中移除该会话记录
+            const titleB64 = Buffer.from(title).toString('base64');
+            const projectB64 = Buffer.from(project).toString('base64');
+            const cleanArgs = [archiveScriptPath, 'clean', '--deep', uuid, titleB64, projectB64, '--purge-parent'];
+            if (query.noAutoOffload === true || query.noAutoOffload === 'true') {
+                cleanArgs.push('--no-auto-offload');
+            }
+
+            execFileSync(process.execPath, cleanArgs, {
+                env: process.env,
+                encoding: 'utf-8',
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+
+            // Idempotent safeguard to ensure parent rows are removed from local SQLite
+            const escapedUuid = uuid.replace(/'/g, "''");
             const deleteSql = `
-                DELETE FROM conversation_summaries WHERE conversation_id = '${uuid}';
-                DELETE FROM conversations_fts WHERE conversation_id = '${uuid}';
+                DELETE FROM conversation_summaries WHERE conversation_id = '${escapedUuid}';
+                DELETE FROM conversations_fts WHERE conversation_id = '${escapedUuid}';
             `;
-            execSync(`sqlite3 "${dbPath}" "${deleteSql}"`, { stdio: ['pipe', 'pipe', 'ignore'] });
+            execFileSync('sqlite3', [dbPath, deleteSql], { stdio: ['ignore', 'pipe', 'ignore'] });
 
             return { success: true, action: 'delete', uuid };
         } catch (err) {
@@ -313,7 +599,7 @@ module.exports = async function(query) {
             execSync(`sqlite3 "${dbPath}" "${deleteSql}"`, { stdio: ['pipe', 'pipe', 'ignore'] });
 
             // 安全清理对应的 brain 空目录
-            const brainBasePath = path.join(os.homedir(), '.gemini/antigravity/brain');
+            const brainBasePath = path.join(workspaceRoot, 'brain');
             let cleanedDirs = 0;
             for (const id of ids) {
                 const convBrainDir = path.join(brainBasePath, id);
@@ -386,16 +672,19 @@ module.exports = async function(query) {
             execSync(`sqlite3 "${dbPath}" "${deleteSubagentsSql}"`, { stdio: ['pipe', 'pipe', 'ignore'] });
 
             // 2. 同步清理 PVE 远程服务器上的过期数据库记录，避免 Mutagen 双向同步将其重新拉回 Mac
-            try {
-                const pveCondition = minAgeHours > 0
-                    ? `AND datetime(last_modified_time) < datetime(\\'now\\', \\'-${minutesOffset} minutes\\') AND (not_fully_idle IS NULL OR not_fully_idle != \\'1\\') AND (status IS NULL OR status != \\'CASCADE_RUN_STATUS_RUNNING\\')`
-                    : `AND (not_fully_idle IS NULL OR not_fully_idle != \\'1\\') AND (status IS NULL OR status != \\'CASCADE_RUN_STATUS_RUNNING\\')`;
-                execSync(`ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no Antigravity 'python3 -c "import sqlite3, os; conn=sqlite3.connect(os.path.expanduser(\\"~/.gemini/antigravity/conversation_summaries.db\\")); conn.execute(\\"DELETE FROM conversation_summaries WHERE (source = \\x27CORTEX_TRAJECTORY_SOURCE_CLI\\x27 OR nesting_depth > 0 OR (parent_conversation_id IS NOT NULL AND parent_conversation_id != \\x27\\x27)) ${pveCondition}\\"); conn.commit()"'`, {
-                    stdio: ['ignore', 'ignore', 'ignore'],
-                    timeout: 5000
-                });
-            } catch (pveErr) {
-                console.warn('[clean_subagents] PVE remote sync cleanup warning:', pveErr.message);
+            if (process.env.AGY_SKIP_REMOTE_SYNC !== '1') {
+                try {
+                    const antigravityHost = process.env.AGY_ANTIGRAVITY_HOST || 'Antigravity';
+                    const pveCondition = minAgeHours > 0
+                        ? `AND datetime(last_modified_time) < datetime(\\'now\\', \\'-${minutesOffset} minutes\\') AND (not_fully_idle IS NULL OR not_fully_idle != \\'1\\') AND (status IS NULL OR status != \\'CASCADE_RUN_STATUS_RUNNING\\')`
+                        : `AND (not_fully_idle IS NULL OR not_fully_idle != \\'1\\') AND (status IS NULL OR status != \\'CASCADE_RUN_STATUS_RUNNING\\')`;
+                    execSync(`ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no ${antigravityHost} 'python3 -c "import sqlite3, os; conn=sqlite3.connect(os.path.expanduser(\\"~/.gemini/antigravity/conversation_summaries.db\\")); conn.execute(\\"DELETE FROM conversation_summaries WHERE (source = \\x27CORTEX_TRAJECTORY_SOURCE_CLI\\x27 OR nesting_depth > 0 OR (parent_conversation_id IS NOT NULL AND parent_conversation_id != \\x27\\x27)) ${pveCondition}\\"); conn.commit()"'`, {
+                        stdio: ['ignore', 'ignore', 'ignore'],
+                        timeout: 5000
+                    });
+                } catch (pveErr) {
+                    console.warn('[clean_subagents] PVE remote sync cleanup warning:', pveErr.message);
+                }
             }
 
             // 3. 运行本地 subagent 文件物理清理脚本 (优先使用内置 scripts/ 目录，降级回退全局配置)

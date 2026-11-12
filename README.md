@@ -43,6 +43,12 @@
 - ✏️ **In-Place File Editor**: Google lets you view files in the right panel, but editing them? "Please install an IDE." Double-click any file preview to edit in-place with crystal-clear syntax highlighting and `⌘S` auto-save. Isn't this supposed to be an AI workspace?<br>
   ✏️ **原地双击编辑**：右侧抽屉只许看不许改是几个意思？改个错字还得专门唤醒外部 IDE。双击直接原地进入高亮编辑，`⌘S` 秒级存盘刷新，这才是正经工作台嘛！
 
+- 🛡️ **Project-Level Permissions**: Brought back axed project permissions along with a bunch of interaction-layer polish. Look, I know what Google's PM was thinking: project permissions are useful, but 4 buttons (especially with three of them repeating the entire mile-long command) were hideous. That diagnosis was right—but that final decision... did Gemini make it for you?<br>
+  🛡️ **项目级权限**：找回了被砍的项目权限，顺手还做了一些交互层的优化。其实我懂 Google 产品经理是怎么想的：项目权限是有用的，但 4 个按钮（特别是三个按钮里都带着长长的命令本身）太丑了——这个判断是对的，但最后的决策，是 Gemini 帮你做的么？
+
+- 🐱 **KitiGravity**: God might have given us a hundred ways to open a terminal, but who could possibly resist summoning a kitty with a single click?<br>
+  🐱 **KitiGravity**：虽然上帝给了100种打开终端的方式，但是谁能拒绝一键召唤小猫呢？
+
 ## Background
 
 Google decided to bless us with a whole bunch of updates on May 20th:
@@ -160,12 +166,14 @@ Injects a highly responsive search box directly into the project selection popov
 Adds a slick golden border and glow to the currently selected radio button options in dialogs, making it much clearer what you have selected. More importantly, it introduces a "click-again to submit" behavior: if you click an already-selected radio option, it will automatically find and trigger the "Submit" button for you. This dramatically speeds up interactions when dealing with multiple-choice workflows!
 
 ### 8. `project_opener.js` & `antigravity_open_project.js` (One-Click IDE Opener)
-Overrides the native "Open Editor" or "Install IDE" button by injecting a customizable dropdown menu, allowing you to open the active project directly into your preferred tools (VS Code, Kitty, Finder, etc.). It supports both single directories and multi-root workspaces. It intelligently hides the Antigravity web IDE option from the menu if you haven't installed it.
+Overrides the native "Open Editor" or "Install IDE" button by injecting a customizable dropdown menu, allowing you to open the active project directly into your preferred tools (VS Code, Kitty, Finder, etc.). It supports both single directories and multi-root workspaces (remembering your preferred sub-folder in `ag_kitty_dir_pref_v1`), hides the Antigravity web IDE option if uninstalled, and links `Open in -> Kitty` directly with the KitiGravity companion pool (hold `⌥ Option` while clicking to toggle/hide the companion window).
 - **Customization:** You can modify the `CONFIG.apps` array at the top of `project_opener.js` to add custom IDEs, change the default application, or update the SVG icons.
 - **Backend Requirement:** This feature relies on the local service (Taichi or Mock Server) to execute the actual shell commands. It expects the endpoint `/api/script/apps/com.google.antigravity/worker/antigravity_open_project` to be available. If using a DIY mock server, you must implement this endpoint to handle the `open` commands.
 
-### 9. `agy_archive.js`, `archive_brain.js` & `archive_hook.js` (Deep & Shallow Archive Tool)
-An intelligent archiving module that provides absolute OCD relief by cleaning up verbose `.system_generated` logs and `scratch` directories within individual `brain` folders. It queries the native `conversation_summaries.db` SQLite database to accurately resolve conversation UUIDs and project names, compresses the cleaned files into `.tar.gz` archives, and maintains an `archive_index.json` metadata record. It runs fully asynchronously as a backend Worker script.
+### 9. `agy_archive.js`, `archive_brain.js` & `archive_hook.js` (Deep & Shallow Archive + 30-Day Auto-Lifecycle)
+An intelligent archiving and lifecycle engine that provides absolute OCD relief by cleaning up verbose `.system_generated` logs and `scratch` directories within individual `brain` folders, resolving UUIDs and projects via `conversation_summaries.db`, bundling `.tar.gz` archives, and maintaining `archive_index.json`.
+- **Cascading Deep-Archive Purge:** Before deep-archiving a session, recursively discovers and purges all spawned subagent `.pb` trajectories, SQLite rows, and `brain` folders plus associated `/tmp` task logs, keeping local storage pristine.
+- **Two-Stage 30-Day Auto-Lifecycle & Cloud Offload:** Runs a debounced daily check (`archive_hook.js`) that auto-shallow-archives idle conversations (>30 days, exempting sessions bound to active/in-review Kanban tasks) and auto-deep-archives long-dormant shallow archives (>30 days). Supports optional `rclone` cloud cold-backup (`offload` / `restore`) with strict byte-size and SHA-256 verification before evicting local tarballs.
 
 ### 10. `kb_trigger.js` & `antigravity_knowledge_index.js` (Command & Knowledge Injector)
 A powerful feature that lets you instantly inject reusable instructions and knowledge fragments into your chat prompt. Simply type `#cmd` (for all), `#cmdg` (for global), or `#cmdl` (for local) in the message input box to trigger a frosted-glass dropdown menu with color-coded badges (`Global`, `Instruction`, and `Knowledge`). Select an item, and it's smoothly injected into your prompt with input-locking protection and batch selection replacement to prevent Lexical editor lag!
@@ -182,20 +190,22 @@ Adds a native-feeling right-click context menu (`📂 在 Finder 中打开`) to 
 Injects a sleek toggle button next to the sidebar search icon that slides down a viewport-anchored, frosted-glass **3-column Kanban board (`Backlog` / `Active` / `Completed`)** right below the topbar.
 - **Workflow Companion:** Designed to work hand-in-hand with our task management system and agent disciple framework: [catclever/agy-disciple](https://github.com/catclever/agy-disciple).
 - **Markdown-Driven:** Directly parses task cards (`.md` files with YAML frontmatter) from `~/.gemini/Projects/<project>/tasks/`, rendering priority-colored left borders (`high`, `medium`, `low`) and tag badges.
-- **Interactive Workflows:**
+- **Interactive Workflows & Session Spotlight:**
+  - **Current Session Spotlight & One-Click Jump:** Automatically pins cards bound to the currently open conversation to the top of their column with a glowing border and `📍 当前对话` badge; other cards provide `💬 跳转对话` / `📦 跳转归档` buttons for instant zero-reload SPA jumps (or `☁️ 已冷备` for cold-archived sessions).
   - **Start in New Chat:** Click `在新对话中启动` on any `Backlog` card to smoothly close the panel, spin up a new chat session, and auto-fill a structured execution prompt linked to `kanban-task-manager`.
   - **Qled Integration:** Click any card to open its underlying Markdown file directly via the `qled://open?path=...` protocol.
-  - **Quick Actions:** Mark `in_review` tasks as completed with a single click, or abandon/delete unstarted `Backlog` tasks with confirmation.
+  - **Quick Actions & Ref-Counted Safe GC:** Mark `in_review` tasks as completed with a single click—cleaning `/tmp` task logs and safely garbage-collecting subagents only when no other active tasks share the session—or abandon/delete unstarted `Backlog` tasks with confirmation.
 
 ### 14. `history_view.js` & `conversation_history_api.js` (Conversation History ⚡ Central View)
 Replaces the native History button with an enhanced `Conversation History ⚡` central dashboard powered directly by Antigravity's local `conversation_summaries.db` SQLite database.
 - **Project Grouping & Theme Linkage:** View sessions in a chronological **Timeline** or grouped by **Project cards** with dynamic Peacock theme-colored borders, folder icons, and indicator dots. Archived conversations are neatly tucked into a collapsible drawer at the bottom of each project card.
+- **Cold-Archive Fusion & One-Click Restore:** Merges deep-archived and cloud-offloaded sessions from `archive_index.json` directly into the history view with `☁️ 115` / `Cloud` cold-storage pills, one-click pull-and-restore buttons, and a manual 30-day lifecycle inspection button in the header.
 - **Subagent Isolation & One-Click Cleanup:** Automatically filters out background subagent and CLI trajectories from the main view while displaying a live `Subagents` counter badge in the header—complete with a one-click cleanup action to purge subagent `.pb` files, DB rows, and `brain` folders.
 - **Smart De-noising & SPA Routing:** Filters out empty `Untitled` draft sessions, auto-derives semantic titles from the first prompt or `/goal` command, and switches conversations instantaneously without page reloads via TanStack Router (`window.__TSR_ROUTER__.navigate`).
 
-### 15. `account_login_inject.js` & `account_manager.js` (Multi-Account Switcher)
-Provides seamless multi-account profile management and hot-switching without repetitive OAuth browser logins.
-- **Dual UI Entry Points:** Injects `Select Saved Account` and `Login via Refresh Token` buttons directly onto the welcome/login screen, plus compact icon buttons (**Switch Account** and **Add Account `+`**) next to the `Sign Out` button in `Settings -> Account`.
+### 15. `account_login_inject.js` & `account_manager.js` (Multi-Account Switcher & Quota Monitor)
+Provides seamless multi-account profile management, live quota visibility, and hot-switching without repetitive OAuth browser logins.
+- **Dual UI Entry Points & Live Quota Monitor:** Injects `Select Saved Account` and `Login via Refresh Token` buttons onto the welcome/login screen, plus compact **Switch Account** and **Add Account `+`** icon buttons next to `Sign Out` in `Settings -> Account`. Account cards display cached **Gemini** and **Claude** remaining quota percentages instantly while refreshing asynchronously in the background (with a header refresh button).
 - **Profile Archiving & Hot-Swap:** Archives account credentials and metadata in `~/.gemini/.accounts/`. Switching accounts automatically updates `state.vscdb`, macOS Keychain entries, and standalone OAuth tokens on the fly, with built-in support for importing or refreshing accounts via Refresh Tokens (RT).
 - **External Configuration:** OAuth client credentials are kept strictly out of git. Simply run `python3 scripts/extract_oauth_clients.py` to auto-extract them, or create `oauth_clients.json` following `oauth_clients.example.json`.
 
@@ -206,10 +216,24 @@ Turns Antigravity's read-only file preview drawer into a fully functional in-pla
 - **IDE Gutter & Single-Line Scroll:** Gutter line numbers strictly adhere to `white-space: pre` to prevent number-wrapping collapses. Code defaults to single-line horizontal scroll (`nowrap`) ensuring exact 1-to-1 line number alignment, with a toggleable wrap switch in the status bar.
 - **De-cluttered Chrome:** Pure SVG icon action buttons (Save 💾, Exit ✕, Format ✨) with hover tooltips, plus a dedicated bottom status bar displaying `Line/Col`, character count, total lines, encoding, and language mode.
 
+### 17. `project_permissions.js` & `project_permissions_api.js` (Project-Level Permissions & Auto-Approval Daemon)
+Restores granular per-project permission control (removed from the official dashboard) via a dual-engine architecture—unlocking independent conversation-level presets in the chat footer while running a background ConnectRPC daemon that evaluates and auto-approves `waitingSteps` across concurrent project sessions and subagents without polluting global `config.json`.
+- **Entry Points & How to Enable:** Click the shield icon (`🛡️`) immediately left of the project name in the topbar to open the **Quick Permission Popover**, or go to `Project Settings` (right above `Skills`) for the full **Project Permissions** card (including `File Access`, `Internet Access`, `Auto-Execution`, and `Sandbox` policies). Flip the header toggle (`已启用` / `未启用`) anytime to enable or pause project-level rules.
+- **In-Prompt Morphing Shield (`Always in this project`):** Streamlines verbose native confirmation labels via pure CSS (`Yes, allow this time` / `Yes, always allow in this conversation` / `Yes, always allow`). When project permissions are enabled, a muted shield button appears beside the `in this conversation` option—click it to collapse the left option into a compact key badge and expand the golden `🛡️ Always in this project` capsule, then click **Submit** (or press `Enter`) to approve and save the rule to the current project.
+- **Action Pills, Wildcards & In-Place Editing:** Rules render as uniform `72×20` color-coded pills (`✓ read`, `× write`, `url`, `command`, `mcp` — green `✓` for Allow, red `×` for Deny) paired with clean bare paths/patterns. Click any pill to flip Allow/Deny on the spot; click any path to edit in-place (the action pill shrinks to a locked single-letter badge for maximum path width). Supports prefix matching plus `*` wildcards across multi-line commands (e.g., `python3 *`) and automatic subpath coverage on wildcard domains/directories (e.g., `*.github.com`, `/Projects/*/src`).
+- **Smart Common-Ancestor Merge (`🪄`):** When multiple rules share a parent path, click the magic wand icon (`🪄`) in the rule header to scan via a bottom-up Trie and propose merges stopping strictly at the **first (deepest) common ancestor** (never over-merging into `$HOME` or `/`). Confirm merges inline, or click the muted block icon (`🚫`) to pin unwanted directories to a per-project ceiling-barrier list (`rejectedMergeDirs`), which can be inspected or restored anytime from the header icon.
+- **Topbar Hit Toast & Atomic Storage:** Auto-approved background or foreground actions trigger a minimalist 3-element toast (`🛡️ Project` + action pill + target) anchored directly beneath the topbar shield icon. All rules and policies are atomically persisted to `~/.gemini/config/projects/<id>.json` and `~/.gemini/antigravity/project_permissions.json`.
+
+### 18. `kitty_companion.js` & `antigravity_kitty_api.js` (KitiGravity Companion Terminal)
+Pairs each project with an on-demand **Kitty 0.49+** companion terminal (`kitten @` remote control via `/tmp/mykitty-*`), giving you one-click command staging and execution without touching your everyday main Kitty windows.
+- **Kitty Dependency (Auto-Hidden When Uninstalled):** Strictly depends on a local [Kitty](https://sw.kovidgoyal.net/kitty/) installation (`kitty` / `kitten`). If Kitty is not installed on your machine, KitiGravity gracefully disables itself—companion entry points, selection floating buttons, and codeblock quick-send icons stay completely hidden with zero UI clutter.
+- **Isolated Companion Pool & Exclusive Show/Hide:** Companion OS Windows are tagged with `agy_companion=1` and per-project metadata. Summoning or sending commands to the current project's companion automatically hides other projects' companion windows and focuses the active one—leaving your normal Kitty windows 100% untouched (hold `⌥ Option` when clicking `Open in -> Kitty` in the topbar to fold/hide).
+- **Selection Floating Bar & Codeblock Header Button:** Highlight any text inside the conversation view to bring up a floating `🐱 Kitty` button right beside `Quote` / `Edit`, or click the cat-ears terminal icon injected in the header of AI shell/CLI codeblocks (`bash`, `zsh`, `sh`, etc.).
+- **Safe Stage vs. Instant Run & Busy-Shell Protection:** Left-click **stages** the command safely into Kitty via bracketed paste (stripping leading `$`/`%` prompts, supporting chunked UTF-8 transfer for long scripts) without pressing `Enter`; hold `⌥ Option` + click to **execute immediately**. Automatically realigns drifted working directories back to the project root, spawns a new tab inside the companion window if the active shell is busy (`at_prompt === false` or in alternate screen like `vim`/`htop`), and remembers your chosen sub-directory in multi-root workspaces (`ag_kitty_dir_pref_v1`).
+
 > **Note**: The `sidebar_reorder.js` feature (which previously folded pinned conversations) has been retired and removed from the default load, as the Antigravity dashboard has officially added native support for this! 🎉
 
 ## Todos
-- 🐱 **KitiGravity**: God might have given us a hundred ways to open a terminal, but who could possibly resist summoning a kitty with a single click?<br>**🐱 KitiGravity**：虽然上帝给了100种打开终端的方式，但是谁能拒绝一键召唤小猫呢？
 - 💻 **VSGGravity**: Even if it absolutely has to be opened in an IDE, Google probably pick Antigravtity IDE...But why not VSCode?<br>💻 **VSGGravity**：就算一定要在IDE中打开，Google应该也不会选它吧？但是为什么不选它呢？
 - ⚡ **ZediGravity**: Did you say IDE? Step aside, you sins of Electron!<br>⚡ **ZediGravity**：你说IDE？就让我来涤荡Eletron的罪孽吧！
 - ……

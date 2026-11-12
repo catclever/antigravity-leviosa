@@ -91,6 +91,8 @@ export function initTopbar() {
             button#leviosa-pm-btn
         ) * {
             color: var(--topbar-text-color, inherit) !important;
+            -webkit-app-region: no-drag !important;
+            app-region: no-drag !important;
         }
     `;
     document.head.appendChild(style);

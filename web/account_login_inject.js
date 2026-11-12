@@ -146,6 +146,10 @@ function ensureStyles() {
             display: inline-block !important;
         }
 
+        .leviosa-spin-icon {
+            animation: leviosaSpin 0.8s linear infinite !important;
+        }
+
         .leviosa-toast {
             position: fixed !important;
             top: 24px !important;
@@ -247,13 +251,150 @@ function waitForLanguageServerAndNavigate(previousPid = null, previousPort = nul
 
             if (isNewProcess && st.url) {
                 clearInterval(timer);
-                // If Electron's onPortChanged hasn't already switched us to the new port, navigate directly
-                if (!window.location.href.startsWith(st.url)) {
-                    window.location.href = st.url;
+                // 同端口直接 reload；若端口发生变化，严禁前端 window.location.href（防止触发 Electron 跨端口外链拦截），
+                // 依赖 Electron 主进程 onPortChanged 自动 win.loadURL(newUrl)。
+                if (window.location.href.startsWith(st.url)) {
+                    window.location.reload();
+                } else {
+                    console.log('[Antigravity Mod] 语言服务已在全新端口就绪，等待 Electron 客户端自动重连:', st.url);
                 }
             }
         } catch (e) {}
     }, 1000);
+}
+
+/**
+ * Renders a compact weekly quota indicator pill for a single model group (Gemini / Claude)
+ */
+function renderQuotaGroupPill(label, fraction) {
+    if (fraction === null || fraction === undefined || Number.isNaN(Number(fraction))) {
+        return `
+            <div style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted-foreground, #9ca3af);">
+                <span style="font-weight: 500; opacity: 0.8;">${label}</span>
+                <div style="width: 40px; height: 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.1); overflow: hidden;"></div>
+                <span style="font-variant-numeric: tabular-nums; opacity: 0.55; min-width: 26px;">--%</span>
+            </div>
+        `;
+    }
+    const pct = Math.max(0, Math.min(100, Math.round(Number(fraction) * 100)));
+    const color = pct > 50 ? '#10b981' : (pct > 20 ? '#f59e0b' : '#ef4444');
+    return `
+        <div style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted-foreground, #9ca3af);">
+            <span style="font-weight: 500; color: var(--foreground, #d4d4d8); opacity: 0.9;">${label}</span>
+            <div style="width: 40px; height: 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.12); overflow: hidden; position: relative;">
+                <div style="width: ${pct}%; height: 100%; border-radius: 999px; background: ${color}; transition: width 0.3s ease, background-color 0.3s ease;"></div>
+            </div>
+            <span style="font-variant-numeric: tabular-nums; font-weight: 600; color: ${color}; min-width: 26px;">${pct}%</span>
+        </div>
+    `;
+}
+
+function renderAccountQuotaRow(quota) {
+    const geminiFrac = quota?.gemini?.weekly_fraction ?? null;
+    const claudeFrac = quota?.claude?.weekly_fraction ?? null;
+    return `
+        <div class="leviosa-quota-row" style="display: flex; align-items: center; gap: 14px; margin-top: 6px; flex-wrap: wrap;">
+            ${renderQuotaGroupPill('Gemini', geminiFrac)}
+            ${renderQuotaGroupPill('Claude', claudeFrac)}
+        </div>
+    `;
+}
+
+function renderAccountsIntoContainer(container, accounts) {
+    if (!container) return;
+    if (!accounts || accounts.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 36px 16px; color: var(--muted-foreground, #9ca3af);">
+                <svg style="margin: 0 auto 12px auto; opacity: 0.5;" xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <div style="font-size: 14px; font-weight: 500; margin-bottom: 4px;">暂无归档账号</div>
+                <div style="font-size: 12px; opacity: 0.8;">请先通过 Refresh Token 添加并保存您的 Google 账号</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = '';
+    accounts.forEach((acc) => {
+        const item = document.createElement('div');
+        item.className = `leviosa-account-item ${acc.is_active ? 'is-active' : ''}`;
+        item.setAttribute('data-email', acc.email);
+
+        const avatarLetter = (acc.name || acc.email || 'U')[0].toUpperCase();
+        const avatarHtml = acc.picture 
+            ? `<img src="${acc.picture}" alt="" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border, rgba(255,255,255,0.1));" onerror="this.outerHTML='<div style=\\'width:38px;height:38px;border-radius:50%;background:rgba(59,130,246,0.15);color:#3b82f6;font-weight:600;display:flex;align-items:center;justify-content:center;font-size:15px;border:1px solid rgba(59,130,246,0.3);\\'>${avatarLetter}</div>'">`
+            : `<div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(59,130,246,0.15); color: #3b82f6; font-weight: 600; display: flex; align-items: center; justify-content: center; font-size: 15px; border: 1px solid rgba(59,130,246,0.3);">${avatarLetter}</div>`;
+
+        const badgeHtml = acc.is_active 
+            ? `<span style="font-size: 11px; font-weight: 500; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
+                 当前已登录
+               </span>`
+            : '';
+
+        const clientTag = acc.client_type === 'business'
+            ? `<span style="font-size: 10px; opacity: 0.65; border: 1px solid var(--border, rgba(255,255,255,0.15)); padding: 0 4px; border-radius: 3px;">企业</span>`
+            : '';
+
+        item.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 auto;">
+                ${avatarHtml}
+                <div style="min-width: 0; flex: 1 1 auto;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: var(--foreground, #ededed);">
+                        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${acc.name || acc.email.split('@')[0]}</span>
+                        ${clientTag}
+                        ${badgeHtml}
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted-foreground, #9ca3af); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+                        ${acc.email}
+                    </div>
+                    <div class="leviosa-quota-slot">
+                        ${renderAccountQuotaRow(acc.quota)}
+                    </div>
+                </div>
+            </div>
+            <div class="leviosa-item-action" style="margin-left: 12px; flex-shrink: 0;">
+                <button class="leviosa-btn-switch-item leviosa-auth-btn" style="height: 28px; padding: 0 12px; font-size: 12px; width: auto; font-weight: 500;">
+                    登录
+                </button>
+            </div>
+        `;
+
+        item.addEventListener('click', async () => {
+            const actionContainer = item.querySelector('.leviosa-item-action');
+            if (actionContainer) {
+                actionContainer.innerHTML = `<span class="leviosa-spinner" style="color: var(--primary, #3b82f6);"></span>`;
+            }
+            showToast(`正在以 ${acc.email} 登录...`, 'info', 2500);
+
+            try {
+                const switchData = await callAccountApi({ action: 'switch', email: acc.email });
+
+                if (switchData.success) {
+                    closeModal();
+                    if (switchData.restarting_ls) {
+                        showToast(`登录成功: ${acc.email}，正在重启语言服务...`, 'info', 12000);
+                        waitForLanguageServerAndNavigate(switchData.previous_ls_pid, switchData.previous_ls_port);
+                    } else {
+                        showToast(`登录成功: ${acc.email}，正在进入工作台...`, 'success', 2500);
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 300);
+                    }
+                } else {
+                    showToast(`登录失败: ${switchData.error || '未知错误'}`, 'error', 4000);
+                    if (actionContainer) {
+                        actionContainer.innerHTML = `<button class="leviosa-btn-switch-item leviosa-auth-btn" style="height: 28px; padding: 0 12px; font-size: 12px; width: auto; font-weight: 500;">重试</button>`;
+                    }
+                }
+            } catch (err) {
+                showToast(`网络请求失败: ${err.message}`, 'error', 4000);
+                if (actionContainer) {
+                    actionContainer.innerHTML = `<button class="leviosa-btn-switch-item leviosa-auth-btn" style="height: 28px; padding: 0 12px; font-size: 12px; width: auto; font-weight: 500;">重试</button>`;
+                }
+            }
+        });
+
+        container.appendChild(item);
+    });
 }
 
 /**
@@ -283,6 +424,9 @@ async function openAccountSelectorModal() {
                 <p style="font-size: 12px; color: var(--muted-foreground, #9ca3af); margin: 4px 0 0 0;">点击直接切换登录，无需重复扫码授权</p>
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
+                <button id="leviosa-btn-refresh-quota" title="刷新额度" style="background: transparent; border: 1px solid var(--border, rgba(255, 255, 255, 0.15)); cursor: pointer; color: var(--foreground, #ededed); width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease;">
+                    <svg id="leviosa-refresh-quota-svg" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 16h5v5"></path></svg>
+                </button>
                 <button id="leviosa-btn-add-new-header" title="添加新账号" style="background: transparent; border: 1px solid var(--border, rgba(255, 255, 255, 0.15)); cursor: pointer; color: var(--foreground, #ededed); width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 </button>
@@ -320,96 +464,64 @@ async function openAccountSelectorModal() {
     card.querySelector('#leviosa-btn-add-new-from-list')?.addEventListener('click', triggerAddToken);
     card.querySelector('#leviosa-btn-add-new-header')?.addEventListener('click', triggerAddToken);
 
-    // Fetch account list
+    let isRefreshingQuota = false;
+    const refreshBtn = card.querySelector('#leviosa-btn-refresh-quota');
+    const refreshSvg = card.querySelector('#leviosa-refresh-quota-svg');
+
+    const refreshAccountsQuota = async () => {
+        if (isRefreshingQuota || !document.body.contains(card)) return;
+        isRefreshingQuota = true;
+        if (refreshBtn) refreshBtn.style.opacity = '0.7';
+        if (refreshSvg) refreshSvg.classList.add('leviosa-spin-icon');
+
+        try {
+            const refreshedData = await callAccountApi({ action: 'refresh_quota' });
+            if (!document.body.contains(card)) return;
+
+            const container = card.querySelector('#leviosa-account-list-container');
+            if (container && refreshedData && refreshedData.success && Array.isArray(refreshedData.accounts)) {
+                const existingItems = container.querySelectorAll('.leviosa-account-item[data-email]');
+                if (existingItems.length === refreshedData.accounts.length && existingItems.length > 0) {
+                    const norm = (s) => (s || '').toLowerCase().trim();
+                    refreshedData.accounts.forEach((acc) => {
+                        const rowEl = Array.from(existingItems).find(el => norm(el.getAttribute('data-email')) === norm(acc.email));
+                        const slotEl = rowEl?.querySelector('.leviosa-quota-slot');
+                        if (slotEl) {
+                            slotEl.innerHTML = renderAccountQuotaRow(acc.quota);
+                        }
+                    });
+                } else {
+                    renderAccountsIntoContainer(container, refreshedData.accounts);
+                }
+            }
+        } catch (e) {
+            console.warn('[Antigravity Mod] 刷新账号额度异常:', e);
+        } finally {
+            isRefreshingQuota = false;
+            if (refreshBtn) refreshBtn.style.opacity = '1';
+            if (refreshSvg) refreshSvg.classList.remove('leviosa-spin-icon');
+        }
+    };
+
+    refreshBtn?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        refreshAccountsQuota();
+    });
+
+    // Fetch account list immediately (with cached quota), then auto-refresh quota in background
     try {
         const data = await callAccountApi({ action: 'list' });
+        if (!document.body.contains(card)) return;
 
         const container = card.querySelector('#leviosa-account-list-container');
         if (!container) return;
 
-        if (!data.success || !data.accounts || data.accounts.length === 0) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 36px 16px; color: var(--muted-foreground, #9ca3af);">
-                    <svg style="margin: 0 auto 12px auto; opacity: 0.5;" xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                    <div style="font-size: 14px; font-weight: 500; margin-bottom: 4px;">暂无归档账号</div>
-                    <div style="font-size: 12px; opacity: 0.8;">请先通过 Refresh Token 添加并保存您的 Google 账号</div>
-                </div>
-            `;
-            return;
+        renderAccountsIntoContainer(container, data.success ? data.accounts : []);
+
+        if (data.success && data.accounts && data.accounts.length > 0) {
+            refreshAccountsQuota();
         }
-
-        container.innerHTML = '';
-        data.accounts.forEach((acc) => {
-            const item = document.createElement('div');
-            item.className = `leviosa-account-item ${acc.is_active ? 'is-active' : ''}`;
-
-            const avatarLetter = (acc.name || acc.email || 'U')[0].toUpperCase();
-            const avatarHtml = acc.picture 
-                ? `<img src="${acc.picture}" alt="" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border, rgba(255,255,255,0.1));" onerror="this.outerHTML='<div style=\\'width:38px;height:38px;border-radius:50%;background:rgba(59,130,246,0.15);color:#3b82f6;font-weight:600;display:flex;align-items:center;justify-content:center;font-size:15px;border:1px solid rgba(59,130,246,0.3);\\'>${avatarLetter}</div>'">`
-                : `<div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(59,130,246,0.15); color: #3b82f6; font-weight: 600; display: flex; align-items: center; justify-content: center; font-size: 15px; border: 1px solid rgba(59,130,246,0.3);">${avatarLetter}</div>`;
-
-            const badgeHtml = acc.is_active 
-                ? `<span style="font-size: 11px; font-weight: 500; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
-                     当前已登录
-                   </span>`
-                : '';
-
-            const clientTag = acc.client_type === 'business'
-                ? `<span style="font-size: 10px; opacity: 0.65; border: 1px solid var(--border, rgba(255,255,255,0.15)); padding: 0 4px; border-radius: 3px;">企业</span>`
-                : '';
-
-            item.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 auto;">
-                    ${avatarHtml}
-                    <div style="min-width: 0; flex: 1 1 auto;">
-                        <div style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: var(--foreground, #ededed);">
-                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${acc.name || acc.email.split('@')[0]}</span>
-                            ${clientTag}
-                            ${badgeHtml}
-                        </div>
-                        <div style="font-size: 12px; color: var(--muted-foreground, #9ca3af); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
-                            ${acc.email}
-                        </div>
-                    </div>
-                </div>
-                <div class="leviosa-item-action" style="margin-left: 12px; flex-shrink: 0;">
-                    <button class="leviosa-btn-switch-item leviosa-auth-btn" style="height: 28px; padding: 0 12px; font-size: 12px; width: auto; font-weight: 500;">
-                        登录
-                    </button>
-                </div>
-            `;
-
-            item.addEventListener('click', async () => {
-                const actionContainer = item.querySelector('.leviosa-item-action');
-                if (actionContainer) {
-                    actionContainer.innerHTML = `<span class="leviosa-spinner" style="color: var(--primary, #3b82f6);"></span>`;
-                }
-                showToast(`正在以 ${acc.email} 登录...`, 'info', 2500);
-
-                try {
-                    const switchData = await callAccountApi({ action: 'switch', email: acc.email });
-
-                    if (switchData.success) {
-                        closeModal();
-                        showToast(`登录成功: ${acc.email}，正在重启语言服务并进入工作台...`, 'success', 12000);
-                        waitForLanguageServerAndNavigate(switchData.previous_ls_pid, switchData.previous_ls_port);
-                    } else {
-                        showToast(`登录失败: ${switchData.error || '未知错误'}`, 'error', 4000);
-                        if (actionContainer) {
-                            actionContainer.innerHTML = `<button class="leviosa-btn-switch-item leviosa-auth-btn" style="height: 28px; padding: 0 12px; font-size: 12px; width: auto; font-weight: 500;">重试</button>`;
-                        }
-                    }
-                } catch (err) {
-                    showToast(`网络请求失败: ${err.message}`, 'error', 4000);
-                    if (actionContainer) {
-                        actionContainer.innerHTML = `<button class="leviosa-btn-switch-item leviosa-auth-btn" style="height: 28px; padding: 0 12px; font-size: 12px; width: auto; font-weight: 500;">重试</button>`;
-                    }
-                }
-            });
-
-            container.appendChild(item);
-        });
-
     } catch (err) {
         const container = card.querySelector('#leviosa-account-list-container');
         if (container) {
@@ -534,8 +646,15 @@ function openTokenLoginModal() {
             }
 
             closeModal();
-            showToast(`登录成功: ${targetEmail}，正在重启语言服务并进入工作台...`, 'success', 12000);
-            waitForLanguageServerAndNavigate(switchData.previous_ls_pid, switchData.previous_ls_port);
+            if (switchData.restarting_ls) {
+                showToast(`登录成功: ${targetEmail}，正在重启语言服务...`, 'info', 12000);
+                waitForLanguageServerAndNavigate(switchData.previous_ls_pid, switchData.previous_ls_port);
+            } else {
+                showToast(`登录成功: ${targetEmail}，正在进入工作台...`, 'success', 2500);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 300);
+            }
 
         } catch (err) {
             submitBtn.disabled = false;
@@ -568,17 +687,54 @@ function createActionButton({ id, text, iconSvg, onClick }) {
  * Inspects DOM and injects buttons into entrance auth panel
  */
 function tryInjectEntranceButtons() {
+    // 1. 清理误注入到会话、工具调用折叠卡片内部的残留元素
+    const misinjected = document.querySelectorAll(
+        '[role="article"] #leviosa-account-buttons-container, ' +
+        '[data-turn-content] #leviosa-account-buttons-container, ' +
+        '[data-testid="tool-group-collapsible"] ~ #leviosa-account-buttons-container, ' +
+        '[data-testid="tool-group-collapsible"] + #leviosa-account-buttons-container'
+    );
+    misinjected.forEach(el => el.remove());
+
+    // 2. 如果当前处于工作区或聊天界面（已登录态），严禁注入登录入口按钮
+    if (document.querySelector('[data-turn-content], [data-testid="user-input-step"], [role="article"], .agy-user-bubble')) {
+        return;
+    }
+
     if (document.getElementById('leviosa-account-buttons-container')) return;
 
+    // 优先匹配标准类名，兜底匹配包含 Continue with Google 的按钮卡片
+    let card = null;
     const authPanel = document.querySelector('.entrance-auth-panel');
-    if (!authPanel) return;
+    if (authPanel) {
+        card = authPanel.querySelector('#other-sign-in-options') ||
+               authPanel.querySelector('.border.bg-card') || 
+               authPanel.querySelector('.bg-card') || 
+               authPanel.querySelector('.rounded-2xl') ||
+               authPanel.firstElementChild;
+    }
 
-    // Find card container inside entrance-auth-panel
-    const card = authPanel.querySelector('.border.bg-card') || 
-                 authPanel.querySelector('.bg-card') || 
-                 authPanel.querySelector('.rounded-2xl') ||
-                 authPanel.firstElementChild;
-    if (!card) return;
+    // 兜底策略：如果 entrance-auth-panel 类名被重命名，寻找严格匹配 Continue with Google 的按钮
+    if (!card) {
+        const allButtons = Array.from(document.querySelectorAll('button'));
+        const googleBtn = allButtons.find(b => {
+            if (b.closest('[role="article"], [data-turn-content], [data-testid*="tool"], [data-testid*="user-"], .agy-user-bubble')) {
+                return false;
+            }
+            const text = (b.textContent || b.title || '').trim();
+            return /^continue with google$/i.test(text);
+        });
+        if (googleBtn) {
+            // 如果它在 #other-sign-in-options 容器里
+            card = googleBtn.closest('#other-sign-in-options') || 
+                   (googleBtn.parentElement && !googleBtn.parentElement.closest('[role="article"]') ? googleBtn.parentElement : null);
+        }
+    }
+
+    if (!card || card.closest('[role="article"], [data-turn-content], [data-testid*="tool"]')) return;
+
+    // Reset cached active account when on the logged-out Welcome screen
+    cachedActiveAccount = null;
 
     const buttons = Array.from(card.querySelectorAll('button'));
     if (buttons.length === 0) return;
@@ -626,9 +782,12 @@ let cachedActiveAccount = null;
 async function getCachedActive() {
     if (!cachedActiveAccount) {
         try {
-            const res = await callAccountApi({ action: 'get_active' });
-            if (res && res.success && res.active) {
-                cachedActiveAccount = res.active;
+            const res = await callAccountApi({ action: 'archive_current' });
+            if (res && res.success && res.account) {
+                cachedActiveAccount = res.account;
+                if (res.is_new) {
+                    showToast(`当前账号 (${res.email}) 已自动入库归档！`, 'success', 3000);
+                }
             }
         } catch (e) {}
     }

@@ -8,17 +8,22 @@ module.exports = async function(query) {
     const supportsWorkspace = query.supportsWorkspace === 'true';
 
     const uuid = query.uuid ? decodeURIComponent(query.uuid) : null;
+    const explicitCwd = query.cwd ? decodeURIComponent(query.cwd) : null;
     const logFile = '/tmp/ag_open.log';
     fs.appendFileSync(logFile, `\n[${new Date().toISOString()}] Received project: "${project}", uuid: "${uuid}", app: "${appName}"\n`);
 
-    if (!project && !uuid) {
+    if (!project && !uuid && !explicitCwd) {
         return { error: 'Missing project and uuid parameters' };
     }
 
     const validPaths = [];
 
+    if (explicitCwd && fs.existsSync(explicitCwd) && fs.statSync(explicitCwd).isDirectory()) {
+        validPaths.push(explicitCwd);
+    }
+
     // 1. Try exact UUID match first
-    if (uuid) {
+    if (validPaths.length === 0 && uuid) {
         const exactPaths = findProjectDirByUUID(uuid);
         if (exactPaths && exactPaths.length > 0) {
             let matched = false;
@@ -51,6 +56,17 @@ module.exports = async function(query) {
         }
     }
 
+    // Delegate Kitty opens directly to KitiGravity Companion Terminal backend API
+    if (appName === 'kitty') {
+        fs.appendFileSync(logFile, `[Antigravity Mod] Delegating kitty summon to antigravity_kitty_api (cwd=${validPaths[0] || ''})\n`);
+        return await require('./antigravity_kitty_api')({
+            action: 'summon',
+            project,
+            uuid,
+            cwd: validPaths[0]
+        });
+    }
+
     if (validPaths.length === 0) {
         return { error: 'Project directory not found', project };
     }
@@ -73,8 +89,6 @@ module.exports = async function(query) {
         const targetPaths = validPaths.map(p => `"${p}"`).join(' ');
         if (appName === 'Finder') {
             command = `open ${targetPaths}`;
-        } else if (appName === 'kitty') {
-            command = `open -a kitty ${targetPaths}`;
         } else if (appName === 'iTerm') {
             command = `open -a iTerm ${targetPaths}`;
         } else if (appName.toLowerCase().includes('cursor')) {

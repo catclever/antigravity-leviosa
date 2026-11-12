@@ -14,6 +14,7 @@
 
 import { extractActiveProjectName } from './project_opener.js';
 import { openFileInFinderBackend } from './api.js';
+import { syncSelectionBarLayout } from './kitty_companion.js';
 
 const API_BASE = 'http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_file_api';
 
@@ -1925,45 +1926,22 @@ function initSelectionEditorButton() {
             // 如果鼠标正按在或悬停在 Edit 按钮上，延缓销毁以避免打断点击事件链
             if (editorBtn && (editorBtn.matches(':active') || editorBtn.matches(':hover'))) return;
 
-            // 如果当前选中的不是合法文件路径，保持原生 Quote 浮层纯净并还原原生样式
+            // 如果当前选中的不是合法文件路径，移除 Edit 按钮并同步浮层布局（若 Kitty 按钮仍在则保留弹性布局）
             if (editorBtn) editorBtn.remove();
             if (divider) divider.remove();
-            parentBar.style.transform = '';
-            parentBar.style.display = '';
-            parentBar.style.width = '';
-            parentBar.style.padding = '';
-            quoteBtn.style.flex = '';
-            quoteBtn.style.padding = '';
-            quoteBtn.style.minWidth = '';
+            syncSelectionBarLayout(parentBar, quoteBtn);
             return;
         }
 
         lastActiveSelectionPath = candidatePath;
         lastActiveSelectionLine = targetLine;
 
-        // 1. 规范父容器布局：采用 inline-flex + 自适应内容包裹，彻底消除内部空白与非对称拉伸
-        parentBar.style.setProperty('display', 'inline-flex', 'important');
-        parentBar.style.setProperty('flex-direction', 'row', 'important');
-        parentBar.style.setProperty('align-items', 'center', 'important');
-        parentBar.style.setProperty('width', 'auto', 'important');
-        parentBar.style.setProperty('max-width', 'none', 'important');
-        parentBar.style.setProperty('box-sizing', 'border-box', 'important');
-        parentBar.style.setProperty('padding', '2px 4px', 'important');
-
-        // 2. 规范原生 Quote 按钮：去除 flex-1 挤压，给足两侧呼吸空间，与 Edit 完美对称
-        quoteBtn.style.setProperty('flex', '0 0 auto', 'important');
-        quoteBtn.style.setProperty('padding', '3px 8px', 'important');
-        quoteBtn.style.setProperty('white-space', 'nowrap', 'important');
-        quoteBtn.style.setProperty('min-width', 'auto', 'important');
-
-        // 3. 浮层视觉重心重平衡：因增加 Edit 按钮宽度，向左微调 20px 使浮层整体中心贴合选区末尾，不再向右过度悬挂
-        parentBar.style.setProperty('transform', 'translateX(-20px)', 'important');
-
-        // 若已存在，更新当前目标路径与行号
+        // 若已存在，更新当前目标路径与行号并同步浮层布局（自适应单按钮 -20px / 双按钮 -42px 偏移）
         if (editorBtn) {
             editorBtn.dataset.targetPath = candidatePath;
             if (targetLine) editorBtn.dataset.targetLine = String(targetLine);
             else delete editorBtn.dataset.targetLine;
+            syncSelectionBarLayout(parentBar, quoteBtn);
             return;
         }
 
@@ -2049,6 +2027,7 @@ function initSelectionEditorButton() {
             parentBar.appendChild(divider);
             parentBar.appendChild(editorBtn);
         }
+        syncSelectionBarLayout(parentBar, quoteBtn);
     }
 
     // 监听选取变化与鼠标释放，增加多阶段延迟以匹配 React 浮层挂载时序
@@ -2059,8 +2038,8 @@ function initSelectionEditorButton() {
     });
 
     document.addEventListener('mouseup', (e) => {
-        // 若鼠标释放发生在 Edit 按钮内部，绝对不触发选区清理
-        if (e.target && e.target.closest && e.target.closest('#ag-selection-editor-btn')) {
+        // 若鼠标释放发生在 Edit 或 Kitty 按钮内部，绝对不触发选区清理
+        if (e.target && e.target.closest && e.target.closest('#ag-selection-editor-btn, #ag-selection-kitty-btn')) {
             return;
         }
         setTimeout(checkAndInjectButton, 10);

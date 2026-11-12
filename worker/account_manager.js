@@ -81,6 +81,8 @@ function getOAuthClient(clientType = 'consumer') {
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
+const QUOTA_SUMMARY_URL = "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary";
+const QUOTA_DETAIL_URL = "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota";
 
 function ensureAccountsDir() {
     if (!fs.existsSync(ACCOUNTS_DIR)) {
@@ -716,13 +718,13 @@ function getLanguageServerStatus() {
     }
     try {
         const raw = fs.readFileSync(LS_LOG_PATH, "utf-8");
-        const pidMatch = raw.match(/Starting language server process with pid (\d+)/);
-        const portMatch = raw.match(/Language server listening on random port at (\d+) for HTTPS/);
+        const pidMatches = Array.from(raw.matchAll(/Starting language server process with pid (\d+)/g));
+        const portMatches = Array.from(raw.matchAll(/Language server listening on random port at (\d+) for HTTPS/g));
         const ready =
             raw.includes("Serving UI bundle from embedded assets") ||
             raw.includes("initialized server successfully");
-        const pid = pidMatch ? Number(pidMatch[1]) : null;
-        const port = portMatch ? Number(portMatch[1]) : null;
+        const pid = pidMatches.length > 0 ? Number(pidMatches[pidMatches.length - 1][1]) : null;
+        const port = portMatches.length > 0 ? Number(portMatches[portMatches.length - 1][1]) : null;
         return {
             pid,
             port,
@@ -767,7 +769,7 @@ function getActiveAccountInfo() {
     const authMethod = stored.auth_method || "consumer";
 
     const claims = decodeJwtClaims(idToken) || {};
-    let email = claims.email || "";
+    let email = claims.email || stored.id_token_email || "";
     let name = claims.name || "";
     let picture = claims.picture || "";
     let userStatusProtoB64 = null;
@@ -778,9 +780,10 @@ function getActiveAccountInfo() {
         for (const f of files) {
             try {
                 const item = JSON.parse(fs.readFileSync(path.join(ACCOUNTS_DIR, f), "utf-8"));
-                const matchByEmail = email && item.email && normalizeEmail(item.email) === normalizeEmail(email);
-                const matchByRt = refreshToken && item.refresh_token && item.refresh_token === refreshToken;
-                if (matchByEmail || matchByRt) {
+                const isMatch = email 
+                    ? (item.email && normalizeEmail(item.email) === normalizeEmail(email))
+                    : (refreshToken && item.refresh_token && item.refresh_token === refreshToken);
+                if (isMatch) {
                     if (!email) email = item.email || "";
                     if (!name) name = item.name || "";
                     if (!picture) picture = item.picture || "";
@@ -845,11 +848,209 @@ function archiveAccountData(account) {
         created_at: existing.created_at || new Date().toISOString(),
         last_used_at: account.last_used_at || existing.last_used_at || new Date().toISOString(),
         user_status_proto_b64: userStatusProto,
+        quota: account.quota || existing.quota || null,
         is_new: isNew
     };
 
     fs.writeFileSync(filePath, JSON.stringify(accountData, null, 2), "utf-8");
     return accountData;
+}
+
+function extractBucketFraction(bucket) {
+    if (!bucket || typeof bucket !== "object") return null;
+    if (typeof bucket.remainingFraction === "number") {
+        return Math.max(0, Math.min(1, bucket.remainingFraction));
+    }
+    if (bucket.remainingFraction !== undefined && bucket.remainingFraction !== null) {
+        const parsed = Number(bucket.remainingFraction);
+        if (!Number.isNaN(parsed)) return Math.max(0, Math.min(1, parsed));
+    }
+    // In proto3 JSON serialization, remainingFraction = 0 is omitted when exhausted
+    if (bucket.resetTime || bucket.bucketId || bucket.modelId) {
+        return 0;
+    }
+    return null;
+}
+
+async function fetchAccountQuota(accountFilePath) {
+    if (!accountFilePath || !fs.existsSync(accountFilePath)) return null;
+    let account;
+    try {
+        account = JSON.parse(fs.readFileSync(accountFilePath, "utf-8"));
+    } catch (e) {
+        return null;
+    }
+    if (!account || !account.refresh_token) return null;
+
+    const tokenRes = await refreshOAuthToken(account.refresh_token, account.client_type || "consumer");
+    const accessToken = tokenRes && tokenRes.access_token;
+    if (!accessToken) return null;
+
+    const authMethod = account.client_type || "consumer";
+    const headers = {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "User-Agent": `antigravity/2.28.2 (os_type=darwin; arch=arm64; cl=1009437749; auth_method=${authMethod}; purpose=aidev_client)`,
+        "X-Goog-Request-Reason": "aidev_client"
+    };
+
+    const summaryRes = await requestWithFallback(
+        QUOTA_SUMMARY_URL,
+        { method: "POST", headers },
+        JSON.stringify({ project: "aicode-consumers" })
+    );
+
+    let summaryData = null;
+    if (summaryRes && summaryRes.statusCode === 200) {
+        try {
+            summaryData = JSON.parse(summaryRes.body);
+        } catch (e) {}
+    }
+
+    let geminiWeeklyFraction = null;
+    let geminiWeeklyResetTime = null;
+    let gemini5hFraction = null;
+    let gemini5hResetTime = null;
+    let claudeWeeklyFraction = null;
+    let claudeWeeklyResetTime = null;
+    let claude5hFraction = null;
+    let claude5hResetTime = null;
+
+    const groups = Array.isArray(summaryData?.groups) ? summaryData.groups : [];
+    for (const grp of groups) {
+        const displayName = String(grp.displayName || "").toLowerCase();
+        const buckets = Array.isArray(grp.buckets) ? grp.buckets : [];
+        const isClaudeGroup =
+            displayName.includes("claude") ||
+            displayName.includes("3p") ||
+            buckets.some(b => String(b.bucketId || "").startsWith("3p-") || String(b.bucketId || "").toLowerCase().includes("claude"));
+        const isGeminiGroup =
+            displayName.includes("gemini") ||
+            buckets.some(b => String(b.bucketId || "").startsWith("1p-") || String(b.bucketId || "").toLowerCase().includes("gemini"));
+
+        if (isClaudeGroup) {
+            for (const b of buckets) {
+                const bid = String(b.bucketId || "").toLowerCase();
+                const win = String(b.window || "").toLowerCase();
+                if (bid === "3p-weekly" || win === "weekly") {
+                    claudeWeeklyFraction = extractBucketFraction(b);
+                    claudeWeeklyResetTime = b.resetTime || null;
+                } else if (bid === "3p-5h" || win === "5h") {
+                    claude5hFraction = extractBucketFraction(b);
+                    claude5hResetTime = b.resetTime || null;
+                }
+            }
+        } else if (isGeminiGroup) {
+            for (const b of buckets) {
+                const bid = String(b.bucketId || "").toLowerCase();
+                const win = String(b.window || "").toLowerCase();
+                if (bid === "gemini-weekly" || win === "weekly") {
+                    geminiWeeklyFraction = extractBucketFraction(b);
+                    geminiWeeklyResetTime = b.resetTime || null;
+                } else if (bid === "gemini-5h" || win === "5h") {
+                    gemini5hFraction = extractBucketFraction(b);
+                    gemini5hResetTime = b.resetTime || null;
+                }
+            }
+        }
+    }
+
+    const quota = {
+        updated_at: new Date().toISOString(),
+        gemini: {
+            weekly_fraction: geminiWeeklyFraction,
+            weekly_reset_time: geminiWeeklyResetTime || null,
+            five_hour_fraction: gemini5hFraction,
+            five_hour_reset_time: gemini5hResetTime || null,
+            reset_time: geminiWeeklyResetTime || null
+        },
+        claude: {
+            weekly_fraction: claudeWeeklyFraction,
+            weekly_reset_time: claudeWeeklyResetTime || null,
+            five_hour_fraction: claude5hFraction,
+            five_hour_reset_time: claude5hResetTime || null
+        }
+    };
+
+    try {
+        const latestAccount = JSON.parse(fs.readFileSync(accountFilePath, "utf-8"));
+        latestAccount.quota = quota;
+        fs.writeFileSync(accountFilePath, JSON.stringify(latestAccount, null, 2), "utf-8");
+    } catch (e) {
+        account.quota = quota;
+        fs.writeFileSync(accountFilePath, JSON.stringify(account, null, 2), "utf-8");
+    }
+
+    return quota;
+}
+
+function readSortedAccountsList(active) {
+    ensureAccountsDir();
+    const activeEmail = active ? normalizeEmail(active.email) : null;
+    const files = fs.readdirSync(ACCOUNTS_DIR).filter(f => f.endsWith(".json") && f !== "oauth_clients.json");
+    const accounts = [];
+
+    for (const f of files) {
+        try {
+            const fullPath = path.join(ACCOUNTS_DIR, f);
+            const raw = fs.readFileSync(fullPath, "utf-8");
+            const item = JSON.parse(raw);
+            if (!item.email) continue;
+
+            const isCurrentActive = activeEmail ? (normalizeEmail(item.email) === activeEmail) : false;
+            accounts.push({
+                email: item.email,
+                name: item.name || "",
+                picture: item.picture || "",
+                client_type: item.client_type || "consumer",
+                created_at: item.created_at || null,
+                last_used_at: item.last_used_at || null,
+                is_active: isCurrentActive,
+                has_refresh_token: !!item.refresh_token,
+                quota: item.quota || null
+            });
+        } catch (e) {}
+    }
+
+    // Sort: active account first, then by last_used_at descending
+    accounts.sort((a, b) => {
+        if (a.is_active && !b.is_active) return -1;
+        if (!a.is_active && b.is_active) return 1;
+        const timeA = new Date(a.last_used_at || 0).getTime();
+        const timeB = new Date(b.last_used_at || 0).getTime();
+        return timeB - timeA;
+    });
+
+    return {
+        success: true,
+        active_email: active ? active.email : null,
+        accounts: accounts
+    };
+}
+
+async function enrichActiveAccountProfile(active) {
+    if (!active || active.picture) return active;
+    try {
+        let userInfo = null;
+        if (active.apiKey) {
+            try {
+                userInfo = await fetchUserInfo(active.apiKey);
+            } catch (e) {
+                userInfo = null;
+            }
+        }
+        if (!userInfo && active.refresh_token) {
+            const tokenRes = await refreshOAuthToken(active.refresh_token, active.client_type || "consumer");
+            if (tokenRes && tokenRes.access_token) {
+                userInfo = await fetchUserInfo(tokenRes.access_token);
+            }
+        }
+        if (userInfo) {
+            if (userInfo.name) active.name = userInfo.name;
+            if (userInfo.picture) active.picture = userInfo.picture;
+        }
+    } catch (e) {}
+    return active;
 }
 
 // ------------------ Export Contract ------------------
@@ -862,53 +1063,37 @@ module.exports = async function(query = {}) {
             case "list": {
                 ensureAccountsDir();
                 const active = getActiveAccountInfo();
-                const activeEmail = active ? normalizeEmail(active.email) : null;
 
                 // Automatically sync/archive the currently logged-in account so its latest refresh_token & id_token are preserved
                 if (active && active.email && active.refresh_token) {
                     try {
+                        await enrichActiveAccountProfile(active);
                         archiveAccountData(active);
                     } catch (e) {}
                 }
 
-                const files = fs.readdirSync(ACCOUNTS_DIR).filter(f => f.endsWith(".json") && f !== "oauth_clients.json");
-                const accounts = [];
+                return readSortedAccountsList(active);
+            }
 
-                for (const f of files) {
-                    try {
-                        const fullPath = path.join(ACCOUNTS_DIR, f);
-                        const raw = fs.readFileSync(fullPath, "utf-8");
-                        const item = JSON.parse(raw);
-                        if (!item.email) continue;
+            case "refresh_quota": {
+                ensureAccountsDir();
+                const active = getActiveAccountInfo();
+                const targetEmail = normalizeEmail(query.email);
 
-                        const isCurrentActive = activeEmail ? (normalizeEmail(item.email) === activeEmail) : false;
-                        accounts.push({
-                            email: item.email,
-                            name: item.name || "",
-                            picture: item.picture || "",
-                            client_type: item.client_type || "consumer",
-                            created_at: item.created_at || null,
-                            last_used_at: item.last_used_at || null,
-                            is_active: isCurrentActive,
-                            has_refresh_token: !!item.refresh_token
-                        });
-                    } catch (e) {}
+                if (targetEmail) {
+                    const targetFile = findAccountFile(targetEmail);
+                    if (!targetFile || !fs.existsSync(targetFile)) {
+                        return { success: false, error: `Account ${targetEmail} not found in archives` };
+                    }
+                    await fetchAccountQuota(targetFile);
+                } else {
+                    const files = fs.readdirSync(ACCOUNTS_DIR).filter(f => f.endsWith(".json") && f !== "oauth_clients.json");
+                    await Promise.allSettled(
+                        files.map(f => fetchAccountQuota(path.join(ACCOUNTS_DIR, f)))
+                    );
                 }
 
-                // Sort: active account first, then by last_used_at descending
-                accounts.sort((a, b) => {
-                    if (a.is_active && !b.is_active) return -1;
-                    if (!a.is_active && b.is_active) return 1;
-                    const timeA = new Date(a.last_used_at || 0).getTime();
-                    const timeB = new Date(b.last_used_at || 0).getTime();
-                    return timeB - timeA;
-                });
-
-                return {
-                    success: true,
-                    active_email: active ? active.email : null,
-                    accounts: accounts
-                };
+                return readSortedAccountsList(active);
             }
 
             case "get_oauth_status": {
@@ -949,6 +1134,7 @@ module.exports = async function(query = {}) {
                     return { success: false, error: "当前活跃账号缺少 refresh_token" };
                 }
 
+                await enrichActiveAccountProfile(active);
                 const saved = archiveAccountData({
                     ...active,
                     last_used_at: new Date().toISOString()
@@ -1069,7 +1255,8 @@ module.exports = async function(query = {}) {
                         expiry: formatRfc3339Local(expiryDate)
                     },
                     auth_method: clientType === "business" ? "business" : "consumer",
-                    id_token: idToken
+                    id_token: idToken,
+                    id_token_email: targetAccount.email
                 };
                 writeJetskiStoredToken(storedToken);
 
@@ -1103,8 +1290,9 @@ module.exports = async function(query = {}) {
                 targetAccount.last_used_at = new Date().toISOString();
                 fs.writeFileSync(targetFile, JSON.stringify(targetAccount, null, 2), "utf-8");
 
-                // 8. Trigger language_server restart so NewAuthClient -> tryRestoreToken() loads the new credentials
-                // and Electron's onPortChanged reloads all windows into the authenticated workspace
+                // 8. 切换账号时必须重启 language_server，以彻底清理其内存中驻留的旧账号 OAuth Token 与 Quota 单例缓存，
+                // 避免运行时出现“串账号”与使用旧账号额度。
+                // 重启后由 Electron 主进程 onPortChanged (win.loadURL) 自动重载窗口，前端不再触发跨端口外链拦截。
                 const prevLsStatus = getLanguageServerStatus();
                 const shouldRestart = safeDecode(query.no_restart) !== "1";
                 if (shouldRestart) {

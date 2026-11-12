@@ -31,6 +31,10 @@
 
 - ✏️ **原地双击编辑**：右侧抽屉只许看不许改是几个意思？改个错字还得专门唤醒外部 IDE。双击直接原地进入高亮编辑，`⌘S` 秒级存盘刷新，这才是正经工作台嘛！
 
+- 🛡️ **项目级权限**：找回了被砍的项目权限，顺手还做了一些交互层的优化。其实我懂 Google 产品经理是怎么想的：项目权限是有用的，但 4 个按钮（特别是三个按钮里都带着长长的命令本身）太丑了——这个判断是对的，但最后的决策，是 Gemini 帮你做的么？
+
+- 🐱 **KitiGravity**：虽然上帝给了100种打开终端的方式，但是谁能拒绝一键召唤小猫呢？
+
 ## 背景
 
 Google 决定在 5 月 20 日用一大堆更新来“赐福”我们：
@@ -139,12 +143,14 @@ Google 决定在 5 月 20 日用一大堆更新来“赐福”我们：
 为弹窗中的单选按钮选项添加精致的金色高亮边框与外发光效果，使选中的选项一目了然。更重要的是引入了“再次点击即提交”的快捷交互：如果你点击了一个已经被选中的单选项，它会自动为你寻找并触发“Submit（提交）”按钮。在处理多选题或确认流时极大提速！
 
 ### 8. `project_opener.js` & `antigravity_open_project.js` (一键闪现外部 IDE)
-无缝接管原生的“Open Editor（打开编辑器）”或“Install IDE”按钮，注入功能强大的多应用下拉菜单，允许你一键将当前项目直接唤起在喜爱的外部工具中（VS Code、Kitty 终端、Finder 等）。完整支持单目录与多根（Multi-root）工作区；若本地未安装 Antigravity Web IDE，还会智能将其从菜单中隐藏。
+无缝接管原生的“Open Editor（打开编辑器）”或“Install IDE”按钮，注入功能强大的多应用下拉菜单，允许你一键将当前项目直接唤起在喜爱的外部工具中（VS Code、Kitty 终端、Finder 等）。完整支持单目录与多根（Multi-root）工作区（自动记忆子目录偏好至 `ag_kitty_dir_pref_v1`）；若本地未安装 Antigravity Web IDE 会智能隐藏，且 `Open in -> Kitty` 直接与 KitiGravity 伴生终端池联动（按住 `⌥ Option` 点击可一键收起/切换隐藏伴生窗）。
 - **自定义配置：** 可直接修改 `project_opener.js` 顶部的 `CONFIG.apps` 数组，添加自定义外部工具、更换默认首选应用或替换 SVG 图标。
 - **后端要求：** 该功能依赖本地服务（Taichi 或 Mock Server）执行实际的 Shell 唤起命令，需后端暴露 `/api/script/apps/com.google.antigravity/worker/antigravity_open_project` 端点。
 
-### 9. `agy_archive.js`, `archive_brain.js` & `archive_hook.js` (深/浅度归档工具)
-拯救强迫症的智能归档模块，深度清理并压缩单个 `brain` 目录下冗余的 `.system_generated` 运行日志与 `scratch` 临时目录。直接通过原生 `conversation_summaries.db` SQLite 数据库精准反查会话 UUID 与项目归属，将清理后的文件打包为 `.tar.gz` 压缩包并维护 `archive_index.json` 索引台账，全程以后台异步 Worker 方式极速运行。
+### 9. `agy_archive.js`, `archive_brain.js` & `archive_hook.js` (深/浅度归档与双阶自动生命周期)
+拯救强迫症的智能归档与生命周期引擎：深度清理并压缩单个 `brain` 目录下冗余的 `.system_generated` 运行日志与 `scratch` 临时目录，通过原生 `conversation_summaries.db` 精准反查会话 UUID 与项目归属，打包 `.tar.gz` 并维护 `archive_index.json` 索引台账。
+- **深归档级联清理（Cascading Purge）：** 执行深归档前自动递归扫描并物理销毁该会话派生的全部 Subagent `.pb` 轨迹、双端 SQLite 记录与 `brain` 目录，同时清扫关联任务在 `/tmp` 下的临时日志与信号文件。
+- **双阶 30 天自动状态机与云端冷备：** 客户端每日防抖静默巡检（`archive_hook.js`）——活跃闲置超 30 天的会话自动打包浅归档（自动豁免绑定了 `active` / `in_review` 看板任务的会话）；浅归档静默超 30 天自动升级为深归档，并支持通过 `rclone` 卸载冷备至云端（`offload` / `restore`，严格校验远端字节数与 SHA-256 后释放本地包）。
 
 ### 10. `kb_trigger.js` & `antigravity_knowledge_index.js` (指令与知识库注入器)
 让你在聊天输入框中瞬间注入高频指令与知识片段的交互神器。只需在输入框中键入 `#cmd`（全部）、`#cmdg`（全局）或 `#cmdl`（本地），即可唤出精美的高透毛玻璃下拉菜单，并带有专属色彩标识徽章（`Global`、`Instruction` 与 `Knowledge`）。选中某项后，通过 Selection API 批量选区替换并加入输入锁定防护，彻底解决 Lexical 富文本编辑器的长文本插入卡顿与误回车问题！
@@ -161,20 +167,22 @@ Google 决定在 5 月 20 日用一大堆更新来“赐福”我们：
 在侧边栏搜索图标右侧注入专属切换按钮，点击即可从顶栏下方平滑呼出视口绝对锚定的高透毛玻璃 **三栏项目任务看板（`Backlog` / `Active` / `Completed`）**。
 - **最佳搭档配套支持：** 专为配合我们的集中式任务管理与智能体框架联动而生：[catclever/agy-disciple](https://github.com/catclever/agy-disciple)。
 - **数据驱动卡片：** 直接读取并解析 `~/.gemini/Projects/<project>/tasks/` 目录下的 Markdown 任务卡（含 YAML frontmatter），根据任务优先级（`high` / `medium` / `low`）渲染彩色标识左边框与状态徽章。
-- **高效交互工作流：**
+- **高效交互工作流与会话 Spotlight 联动：**
+  - **当前会话高亮与单向跳转：** 绑定当前打开会话的任务卡片自动置顶并赋予发光边框与 `📍 当前对话` 徽章；其余存活/浅归档会话卡片提供 `💬 跳转对话` / `📦 跳转归档` 按钮实现无刷新 SPA 直达（已深归档会话则展示 `☁️ 已冷备` 胶囊）。
   - **新对话中启动：** 点击 `Backlog` 卡片上的「在新对话中启动」，自动收起看板、秒级建立新会话，并将包含任务背景、标题与 MCP 状态流转规范的结构化 Prompt 自动填入输入框。
   - **Qled 无缝联动：** 点击任意卡片，通过 `qled://open?path=...` 协议在外部 Markdown 编辑器中快速打开编辑。
-  - **便捷卡片管理：** 支持对 `in_review` 任务一键点击标记完成，支持对未开始的 `Backlog` 任务在二次确认后物理删除。
+  - **便捷结单与引用计数安全 GC：** 支持对 `in_review` 任务一键标记完成（自动清理该任务 `/tmp` 日志，并在确认同会话无其他活跃任务锁后安全回收空闲 Subagent）；支持对未开始的 `Backlog` 任务二次确认物理删除。
 
 ### 14. `history_view.js` & `conversation_history_api.js` (Conversation History ⚡ 会话历史中心)
 接管原生 History 按钮，唤出直连本地 `conversation_summaries.db` SQLite 数据库的增强版 `Conversation History ⚡` 全景中心大厅。
 - **项目卡片分组与主题联动：** 支持按 **时间轴 (Timeline)** 或按 **项目卡片 (Project cards)** 分组查看会话，项目卡片边框、文件夹图标与指示灯自动联动专属 Peacock 主题色；归档会话默认收纳在卡片底部的抽屉中。
+- **云端冷备融合与一键拉回恢复：** 自动融合 `archive_index.json` 中已从 SQLite 移除的深归档与云端冷备会话记录，渲染 `☁️ 115` / `Cloud` 冷备徽章与一键拉回解包恢复按钮，并在顶栏提供手动触发 30 天生命周期巡检入口。
 - **Subagent 隔离与一键清理：** 默认自动剥离后台 Subagent 与 CLI 自动化任务流，顶栏实时展示 `Subagents` 双轨统计数量，并提供一键清理操作（彻底抹除子代理 `.pb` 文件、数据库记录与 `brain` 运行痕迹）。
 - **智能降噪与 SPA 路由：** 自动过滤空白无内容的 `Untitled` 草稿，从未命名会话首句或 `/goal` 自动提炼语义化标题，借助 TanStack Router (`window.__TSR_ROUTER__.navigate`) 实现无需刷新页面的瞬时切流。
 
-### 15. `account_login_inject.js` & `account_manager.js` (多账号档案管理与无缝切换)
-告别繁琐的 OAuth 浏览器跳转，实现真正的多账号凭证独立归档与瞬时热切换。
-- **双重 UI 入口注入：** 在欢迎/登录界面直接注入「选择已有账号」与「通过 Refresh Token 登录」按钮；在 `Settings -> Account` 面板的 `Sign Out` 旁注入极简纯图标的**切换账号（头像+双向箭头）**与**添加账号（+）**按钮。
+### 15. `account_login_inject.js` & `account_manager.js` (多账号档案管理、配额监控与无缝切换)
+告别繁琐的 OAuth 浏览器跳转，实现真正的多账号凭证独立归档、实时额度透视与瞬时热切换。
+- **双重入口与实时配额监控：** 在欢迎/登录界面直接注入「选择已有账号」与「通过 Refresh Token 登录」按钮；在 `Settings -> Account` 面板的 `Sign Out` 旁注入极简纯图标的**切换账号（头像+双向箭头）**与**添加账号（+）**按钮。账号卡片即时展示缓存的 **Gemini** 与 **Claude** 分组剩余额度百分比，并在后台静默异步刷新（右上角支持一键手动刷新）。
 - **账号档案与热切换：** 账号凭证与元数据独立归档于 `~/.gemini/.accounts/`，切换时瞬时热更 `state.vscdb`、macOS Keychain 钥匙串与独立 OAuth Token，并原生支持导入与刷新 Refresh Token (RT)。
 - **外部化凭证安全隔离：** OAuth 客户端凭证与开源代码完全脱钩，不进入 git 追踪。只需在终端执行 `python3 scripts/extract_oauth_clients.py` 自动提取本机凭证，或参考 `oauth_clients.example.json` 自行配置。
 
@@ -185,10 +193,24 @@ Google 决定在 5 月 20 日用一大堆更新来“赐福”我们：
 - **专业行号与单行滚动：** 行号条严格采用 `white-space: pre` 与位数弹性自适应，绝不发生数字折行混叠；代码默认遵循专业 IDE 规范的单行横向滚动（`nowrap`），行号与代码行永久保持 1:1 精确水平对齐，并在底栏提供折行切换开关。
 - **纯图标顶栏与独立状态栏：** 顶栏操作彻底纯图标化（保存 💾、退出 ✕、JSON 格式化 ✨），提示与快捷键全部收纳至 hover 气泡；底部独立状态条清晰展示光标 `行 X, 列 Y`、字符总数、总行数、语言及编码格式。
 
+### 17. `project_permissions.js` & `project_permissions_api.js` (项目级独立权限控制与后台守护引擎)
+通过纯注入双引擎架构找回被官方砍掉的**项目级细粒度权限控制**：一方面解锁聊天底栏原生的会话级独立预设（`This Conversation`），另一方面在后台运行 ConnectRPC 自动审批守护协程，按项目精准隔离并自动放行多并发会话与 Subagent 的权限请求，绝不污染全局 `config.json`。
+- **入口与启用方法：** 点击顶栏项目名称正左侧的小盾牌图标（`🛡️`）即可呼出**项目权限快速面板**；也可进入 `Project Settings`（位于 `Skills` 上方）配置完整的项目级文件读写、网络访问、命令自动执行与沙盒策略。点击面板头部的开关（`已启用` / `未启用`）即可随时开启或暂停当前项目的权限接管。
+- **确认框同排伸缩授权（`Always in this project`）：** 通过纯 CSS 伪元素将冗长重复的原生确认按钮精简为清晰的三级语义（`Yes, allow this time` / `Yes, always allow in this conversation` / `Yes, always allow`）。当项目权限启用时，第 2 项（本会话）右侧会注入一枚低调的灰色盾牌按钮——点击后左侧选项平滑收折为快捷键小徽标（保持选中），右侧拉开为金色 `🛡️ Always in this project` 胶囊，再点 **Submit**（或按回车）即可放行并持久化写入当前项目白名单（点 `✕` 可随时收回）。
+- **等宽药丸视图、通配符与原地编辑：** 规则列表统一采用等宽 `72×20` 纯色动作胶囊（`read` / `write` / `url` / `command` / `mcp`，绿底 `✓` 为允许、红底 `×` 为拒绝）搭配裸路径展示。点击胶囊可秒切允许/拒绝；点击右侧路径即可**原地修改**（编辑态动作胶囊自动锁定并收缩为单首字母，释放最大路径视野），顶部添加栏亦支持手动录入。完整支持前缀匹配与 `*` 通配符——涵盖带换行符的多行命令（如 `python3 *`），以及未写末尾 `/*` 的通配域名与目录子路径自动兼容（如 `*.github.com`、`/Projects/*/src`）。
+- **首层公共祖先智能合并（`🪄`）与屏蔽屏障：** 当同一动作下存在多条同源子路径规则时，点击规则区头部的魔术棒图标（`🪄`），系统会通过自底向上前缀树（Post-Order Trie）自动探测并在**第一个（最深）公共祖先目录**处停止合并（严防向上冒泡误合并至 `$HOME` 或 `/`），展开二次确认预览后即可一键收敛。若某目录不希望被合并，可点击单线屏蔽图标将其加入项目专属的**天花板屏障列表**（`rejectedMergeDirs`），后续不再合并至该层级且不会越级泄漏，随时可通过头部低调图标查看或恢复。
+- **顶栏轻提示与双端持久化：** 后台或前台命中项目规则自动放行时，顶栏小盾牌正下方会滑出极简三要素轻提示（`🛡️ 项目名` + 动作胶囊 + 目标路径）。所有配置通过 Worker 原子同步持久化至 `~/.gemini/config/projects/<id>.json` 与 `~/.gemini/antigravity/project_permissions.json`。
+
+### 18. `kitty_companion.js` & `antigravity_kitty_api.js` (KitiGravity 伴生终端联动)
+基于 **Kitty 0.49+** 远程控制协议（自动发现 `/tmp/mykitty-*` Socket 并执行 `kitten @`）为每个项目维护专属的按需伴生终端，实现对话流划词与代码块的一键投递，全程 **100% 零触碰你日常使用的主力 Kitty 窗口**。
+- **前置依赖（未安装自动隐身）：** 本功能依赖本机已安装 [Kitty 终端](https://sw.kovidgoyal.net/kitty/)（`kitty` / `kitten`）。若系统未安装 Kitty，该模块会自动静默降级隐藏——伴生入口、划词 `🐱 Kitty` 按钮与代码块投递图标均不会渲染出现，不留任何无效按钮。
+- **独立伴生池与跨项目排他显隐：** 伴生 OS Window 自动注入 `agy_companion=1` 与项目专属标签。每次召唤或投递命令时，仅在伴生池内自动隐藏其他项目的伴生窗，并将当前项目伴生窗唤醒置顶（兼容伴生窗内手动 `⌘T` 新建 Tab 的整窗识别；按住 `⌥ Option` 点击顶栏 `Open in -> Kitty` 可一键收起隐藏）。
+- **划词悬浮条与代码块快捷按钮：** 在对话区选中任意命令文本时，原生 Quote 浮层旁会自动浮现 `🐱 Kitty` 快捷按钮（与文件编辑 `Edit` 按钮无感并存）；AI 输出的 Shell/命令行代码块（`bash`、`zsh`、`sh` 等）右上角工具栏亦直接注入猫耳终端投递图标。
+- **安全上膛 vs 直接开跑 & 忙碌防误伤：** 默认左键点击为**「安全上膛不回车」**（自动剥离行首 `$`/`%` 提示符、通过 Bracketed Paste 安全粘贴至终端并聚焦，超长多字节脚本自动分块传输）；按住 `⌥ Option` 点击则为**「直接回车执行」**。内置宽容路径对齐（目录越界漂移时自动 `cd` 回项目根）与忙碌状态保护（检测到当前 Shell 正在运行任务或处于 `vim`/`htop` 备用屏时自动在伴生窗内裂变新 Tab），并支持多目录工作区子目录偏好记忆（`ag_kitty_dir_pref_v1`）。
+
 > **注**：`sidebar_reorder.js`（原用于折叠置顶会话）已被废弃并移出默认加载流，因为 Antigravity 官方仪表盘现已原生支持该特性！🎉
 
 ## 待办计划 (Todos)
-- 🐱 **KitiGravity**: God might have given us a hundred ways to open a terminal, but who could possibly resist summoning a kitty with a single click?<br>**🐱 KitiGravity**：虽然上帝给了100种打开终端的方式，但是谁能拒绝一键召唤小猫呢？
 - 💻 **VSGGravity**: Even if it absolutely has to be opened in an IDE, Google probably pick Antigravtity IDE...But why not VSCode?<br>💻 **VSGGravity**：就算一定要在IDE中打开，Google应该也不会选它吧？但是为什么不选它呢？
 - ⚡ **ZediGravity**: Did you say IDE? Step aside, you sins of Electron!<br>⚡ **ZediGravity**：你说IDE？就让我来涤荡Eletron的罪孽吧！
 - ……

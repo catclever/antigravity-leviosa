@@ -2,7 +2,6 @@
 import { initTopbar } from './topbar_color.js';
 import { initProjectDots } from './project_dots.js';
 import { initBackground } from './background.js';
-import { initProjectSearch } from './project_search.js';
 import { initDoubleClickSubmit } from './double_click_submit.js';
 import { initProjectOpener } from './project_opener.js';
 import { initArchiveHook } from './archive_hook.js';
@@ -13,6 +12,8 @@ import { initPanelInject } from './panel_inject.js';
 import { initHistoryView } from './history_view.js';
 import { initAccountLoginInject } from './account_login_inject.js';
 import { initFileEditor } from './file_editor.js';
+import { initProjectPermissions } from './project_permissions.js';
+import { initKittyCompanion } from './kitty_companion.js';
 
 console.log('🚀 [Antigravity Mod] 正在加载模块化组件...');
 
@@ -21,7 +22,6 @@ if (window === window.top) {
     initBackground();
     initTopbar();
     initProjectDots();
-    initProjectSearch();
     initDoubleClickSubmit();
     initProjectOpener();
     initArchiveHook();
@@ -40,6 +40,12 @@ if (window === window.top) {
 
     // 新增文件预览面板本地文件双击原地编辑 (Cmd+S / Esc)
     initFileEditor();
+
+    // 新增项目级权限恢复与并发隔离守护引擎
+    initProjectPermissions();
+
+    // 新增 KitiGravity 伴生终端前端联动 (划词悬浮发送 & 代码块快捷上膛/执行)
+    initKittyCompanion();
 
     console.log('✅ [Antigravity Mod] 所有模块加载完毕！');
 } else {

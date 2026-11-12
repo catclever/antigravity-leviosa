@@ -46,11 +46,111 @@ export const CONFIG = {
 
 import { openProjectBackend } from './api.js';
 
+const KITTY_DIR_PREF_STORAGE_KEY = 'ag_kitty_dir_pref_v1';
+const KITTY_API_ENDPOINT = 'http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_kitty_api';
+const KITTY_BUTTON_TOOLTIP = 'Summon Kitty Companion (⌥+Click to Toggle/Hide)';
+
 let currentProject = "";
 let selectedApp = CONFIG.apps.find(app => app.id === CONFIG.defaultAppId) || CONFIG.apps.find(app => !app.isWeb) || CONFIG.apps[0];
 let appSelectorMenu = null;
 
-if (!window._ag_global_listener_added_v5) {
+function normalizePrefProjectKey(project) {
+    if (!project || typeof project !== 'string') return '';
+    return project.split('/')[0].trim();
+}
+
+function readKittyDirPrefStore() {
+    try {
+        if (typeof localStorage === 'undefined') {
+            return { byUuid: {}, byProject: {} };
+        }
+        const raw = localStorage.getItem(KITTY_DIR_PREF_STORAGE_KEY);
+        if (!raw) {
+            return { byUuid: {}, byProject: {} };
+        }
+        const parsed = JSON.parse(raw);
+        return {
+            byUuid: parsed && parsed.byUuid && typeof parsed.byUuid === 'object' ? parsed.byUuid : {},
+            byProject: parsed && parsed.byProject && typeof parsed.byProject === 'object' ? parsed.byProject : {}
+        };
+    } catch (e) {
+        return { byUuid: {}, byProject: {} };
+    }
+}
+
+function writeKittyDirPrefStore(store) {
+    try {
+        if (typeof localStorage === 'undefined') return;
+        localStorage.setItem(KITTY_DIR_PREF_STORAGE_KEY, JSON.stringify(store));
+    } catch (e) {}
+}
+
+export function getPreferredKittyDir(project, uuid) {
+    const store = readKittyDirPrefStore();
+    const cleanUuid = typeof uuid === 'string' ? uuid.trim() : '';
+    if (cleanUuid && store.byUuid[cleanUuid]) {
+        return store.byUuid[cleanUuid];
+    }
+    const projKey = normalizePrefProjectKey(project);
+    if (projKey && store.byProject[projKey]) {
+        return store.byProject[projKey];
+    }
+    return null;
+}
+
+export function setPreferredKittyDir(project, uuid, dirPath) {
+    if (!dirPath || typeof dirPath !== 'string') return;
+    const cleanDir = dirPath.trim();
+    if (!cleanDir) return;
+
+    const store = readKittyDirPrefStore();
+    const cleanUuid = typeof uuid === 'string' ? uuid.trim() : '';
+    if (cleanUuid) {
+        store.byUuid[cleanUuid] = cleanDir;
+    }
+    const projKey = normalizePrefProjectKey(project);
+    if (projKey) {
+        store.byProject[projKey] = cleanDir;
+    }
+    writeKittyDirPrefStore(store);
+}
+
+if (typeof window !== 'undefined') {
+    window.__agKittyDirPrefs = {
+        get: getPreferredKittyDir,
+        set: setPreferredKittyDir
+    };
+}
+
+async function invokeKittyCompanionBackend({ action = 'summon', project = '', uuid = '', cwd = '' }) {
+    const params = [];
+    params.push(`action=${encodeURIComponent(action)}`);
+    params.push(`project=${encodeURIComponent(project || '')}`);
+    params.push(`uuid=${encodeURIComponent(uuid || '')}`);
+    if (cwd) {
+        params.push(`cwd=${encodeURIComponent(cwd)}`);
+    }
+    const url = `${KITTY_API_ENDPOINT}?${params.join('&')}`;
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        if (!data.success) {
+            console.error('[Antigravity Mod] Kitty Companion 操作失败:', data.error || data);
+            if (typeof alert === 'function') {
+                alert(`⚠️ Kitty Companion 操作失败:\n${data.error || '未知错误'}\n项目: ${project || '(未命名)'}`);
+            }
+        }
+        return data;
+    } catch (err) {
+        console.error('[Antigravity Mod] 请求 Kitty Companion 后台失败', err);
+        if (typeof alert === 'function') {
+            alert(`⚠️ Antigravity 请求后台失败！Taichi服务是否在 9216 端口运行？\n${err.message}`);
+        }
+        return { success: false, error: err.message };
+    }
+}
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window._ag_global_listener_added_v5) {
     window._ag_global_listener_added_v5 = true;
     document.addEventListener('click', (e) => {
         if (e.target.closest('.ag-dropdown-menu')) return;
@@ -68,9 +168,28 @@ if (!window._ag_global_listener_added_v5) {
             
             const uuid = extractActiveUUID();
             const proj = extractActiveProjectName() || currentProject;
+
+            // ⌥ Option + Click when Kitty is selected: immediately toggle/hide Companion Kitty window
+            if (selectedApp.id === 'kitty' && e.altKey) {
+                btn.style.opacity = '0.5';
+                const preferredDir = getPreferredKittyDir(proj, uuid) || '';
+                const toggleUrl = `${KITTY_API_ENDPOINT}?action=toggle&project=${encodeURIComponent(proj || '')}&uuid=${encodeURIComponent(uuid || '')}${preferredDir ? `&cwd=${encodeURIComponent(preferredDir)}` : ''}`;
+                fetch(toggleUrl)
+                    .then(res => res.json())
+                    .then(data => {
+                        btn.style.opacity = '1';
+                        if (!data.success) {
+                            console.error('[Antigravity Mod] Toggle Kitty Companion failed:', data.error || data);
+                        }
+                    })
+                    .catch(err => {
+                        btn.style.opacity = '1';
+                        console.error('[Antigravity Mod] Toggle Kitty Companion request failed:', err);
+                    });
+                return;
+            }
             
             // Add a simple loading state to the button
-            const originalHtml = btn.innerHTML;
             btn.style.opacity = '0.5';
             
             fetch(`http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/antigravity_list_project_dirs?uuid=${uuid || ''}&project=${encodeURIComponent(proj || '')}`)
@@ -79,13 +198,31 @@ if (!window._ag_global_listener_added_v5) {
                     btn.style.opacity = '1';
                     if (data.success && data.paths && data.paths.length > 1) {
                         showSubProjectSelector(btn, proj, data.paths, uuid);
+                    } else if (selectedApp.id === 'kitty') {
+                        const singleCwd = (data.success && data.paths && data.paths[0]) || getPreferredKittyDir(proj, uuid) || '';
+                        invokeKittyCompanionBackend({
+                            action: 'summon',
+                            project: proj || '',
+                            uuid: uuid || '',
+                            cwd: singleCwd
+                        });
                     } else {
                         openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace, uuid);
                     }
                 })
                 .catch(err => {
                     btn.style.opacity = '1';
-                    openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace, uuid);
+                    if (selectedApp.id === 'kitty') {
+                        const fallbackCwd = getPreferredKittyDir(proj, uuid) || '';
+                        invokeKittyCompanionBackend({
+                            action: 'summon',
+                            project: proj || '',
+                            uuid: uuid || '',
+                            cwd: fallbackCwd
+                        });
+                    } else {
+                        openProjectBackend(proj, selectedApp.appName, !!selectedApp.supportsWorkspace, uuid);
+                    }
                 });
             return;
         }
@@ -105,22 +242,39 @@ function showSubProjectSelector(anchorElement, repoName, paths, uuid) {
     const wrapper = document.createElement('div');
     wrapper.className = 'py-1 overflow-auto flex flex-col overscroll-y-none max-h-60';
     subProjSelectorMenu.appendChild(wrapper);
+
+    const preferredDir = getPreferredKittyDir(repoName, uuid);
     
     paths.forEach(p => {
         const basename = p.split('/').pop();
+        const isPreferred = preferredDir === p;
         const item = document.createElement('button');
         item.className = 'w-full text-left whitespace-nowrap transition-colors duration-150 select-none flex items-center gap-2 px-3 py-2 text-[13px] focus-visible:bg-secondary/50 focus:outline-none no-focus-ring cursor-pointer text-secondary-foreground hover:bg-secondary/50 hover:text-foreground';
         item.setAttribute('role', 'option');
+        item.title = p;
         
         // Add a generic folder icon
         const folderIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-70"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-1.22-1.8A2 2 0 0 0 8.4 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path></svg>`;
-        item.innerHTML = `<div class="flex items-center gap-2 w-full"><div class="flex-shrink-0 flex items-center justify-center">${folderIcon}</div><span class="truncate">${basename}</span></div>`;
+        const prefBadge = isPreferred
+            ? `<span class="ml-auto pl-2 text-[10px] opacity-60">●</span>`
+            : '';
+        item.innerHTML = `<div class="flex items-center gap-2 w-full"><div class="flex-shrink-0 flex items-center justify-center">${folderIcon}</div><span class="truncate">${basename}</span>${prefBadge}</div>`;
         
         item.onclick = (ev) => {
             ev.stopPropagation();
             subProjSelectorMenu.style.display = 'none';
+            setPreferredKittyDir(repoName, uuid, p);
             const queryProj = (repoName && repoName !== basename) ? `${repoName}/${basename}` : basename;
-            openProjectBackend(queryProj, selectedApp.appName, !!selectedApp.supportsWorkspace, uuid);
+            if (selectedApp.id === 'kitty') {
+                invokeKittyCompanionBackend({
+                    action: 'summon',
+                    project: queryProj,
+                    uuid: uuid || '',
+                    cwd: p
+                });
+            } else {
+                openProjectBackend(queryProj, selectedApp.appName, !!selectedApp.supportsWorkspace, uuid);
+            }
         };
         wrapper.appendChild(item);
     });
@@ -226,6 +380,28 @@ function showAppSelector(anchorElement) {
     `;
 }
 
+function syncActionTooltip(anchorResult) {
+    const tooltipText = selectedApp.id === 'kitty' ? KITTY_BUTTON_TOOLTIP : `Open in ${selectedApp.name}`;
+    if (anchorResult && anchorResult.type === 'native' && anchorResult.element) {
+        if (anchorResult.element.getAttribute('title') !== tooltipText) {
+            anchorResult.element.setAttribute('title', tooltipText);
+        }
+    }
+    const actionBtn = document.getElementById('ag-app-action-btn');
+    if (actionBtn && actionBtn.getAttribute('title') !== tooltipText) {
+        actionBtn.setAttribute('title', tooltipText);
+    }
+    const selectorBtn = document.getElementById('ag-app-selector-btn');
+    if (selectorBtn) {
+        const selectorTip = selectedApp.id === 'kitty'
+            ? `${KITTY_BUTTON_TOOLTIP} — Click arrow to switch app`
+            : 'Switch target application';
+        if (selectorBtn.getAttribute('title') !== selectorTip) {
+            selectorBtn.setAttribute('title', selectorTip);
+        }
+    }
+}
+
 function updateSelectorButton() {
     const anchorResult = captureNativeIdeAnchor();
     const isStandalone = anchorResult && anchorResult.type === 'fallback';
@@ -245,6 +421,7 @@ function updateSelectorButton() {
             btn.innerHTML = `<span class="flex items-center justify-center w-4 h-4">${selectedApp.icon}</span> <span class="text-[10px] opacity-50 ml-1">▼</span>`;
         }
     }
+    syncActionTooltip(anchorResult);
 }
 
 export function extractActiveProjectName() {
@@ -455,11 +632,12 @@ function maintainSelectorButton() {
             if (btn.previousElementSibling !== nativeBtn && nativeBtn.parentElement) {
                 nativeBtn.after(btn);
             }
+            syncActionTooltip(anchorResult);
         }
     } else if (anchorResult.type === 'fallback') {
         const fallbackBtn = anchorResult.element;
         // 先清理可能存在的原生依附按钮
-        let oldBtn = document.getElementById('ag-app-selector-btn');
+        const oldBtn = document.getElementById('ag-app-selector-btn');
         if (oldBtn && (!oldBtn.parentElement || oldBtn.parentElement.id !== 'ag-standalone-open-in-group')) {
             oldBtn.remove();
         }
@@ -497,6 +675,7 @@ function maintainSelectorButton() {
             if (group.nextElementSibling !== fallbackBtn && fallbackBtn.parentElement) {
                 fallbackBtn.before(group);
             }
+            syncActionTooltip(anchorResult);
         }
     }
 }

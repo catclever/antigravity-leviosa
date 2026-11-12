@@ -2,6 +2,7 @@
  * web/history_view.js
  * 
  * Replicated Conversation History Central View + Sidebar Fallback Entry
+ * + 30-Day Auto-Archive Lifecycle Controls & Cold Archive (115) Display/Restore
  */
 
 import { fetchThemeColor } from './api.js';
@@ -130,59 +131,96 @@ function injectSidebarButton() {
  * 创建/保证全局唯一的中央主视图挂载点
  */
 function ensureHistoryContainer() {
+    // 动态注入历史大厅透明毛玻璃联动样式与云端冷备显式 RGBA 样式
+    const glassStyleId = 'leviosa-history-glass-style';
+    let styleEl = document.getElementById(glassStyleId);
+    if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = glassStyleId;
+        (document.head || document.documentElement).appendChild(styleEl);
+    }
+    styleEl.textContent = `
+        #leviosa-history-view {
+            background-image:
+                linear-gradient(color-mix(in srgb, var(--antigravity-theme-color, #1e1e1e) 75%, transparent), color-mix(in srgb, var(--antigravity-theme-color, #1e1e1e) 75%, transparent)),
+            linear-gradient(135deg, transparent 0%, rgba(0, 0, 0, 0.05) 40%),
+                var(--antigravity-bg) !important;
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+            background-attachment: fixed !important;
+            background-color: transparent !important;
+            backdrop-filter: blur(2px) !important;
+            -webkit-backdrop-filter: blur(2px) !important;
+            box-shadow: inset 1px 0 0 0 rgba(255, 255, 255, 0.05) !important;
+        }
+
+        #leviosa-sticky-header {
+            background-color: transparent !important;
+            background-image: none !important;
+            backdrop-filter: blur(16px) !important;
+            -webkit-backdrop-filter: blur(16px) !important;
+        }
+
+        .leviosa-project-group {
+            background-color: color-mix(in srgb, var(--antigravity-theme-color, #1e1e1e) 45%, transparent) !important;
+            backdrop-filter: blur(8px) !important;
+            -webkit-backdrop-filter: blur(8px) !important;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+        .leviosa-project-group:hover {
+            filter: brightness(1.03);
+        }
+
+        #leviosa-history-list [data-leviosa-convo-id]:hover {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        /* 云端 115 冷备与本地深归档胶囊样式（显式 RGBA，不依赖宿主未编译的任意 Tailwind JIT 类） */
+        .leviosa-cold-pill {
+            background-color: rgba(56, 189, 248, 0.12);
+            color: rgb(125, 211, 252);
+            border: 1px solid rgba(56, 189, 248, 0.28);
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 9999px;
+            line-height: 1.4;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            flex-shrink: 0;
+        }
+
+        .leviosa-local-deep-pill {
+            background-color: rgba(168, 85, 247, 0.12);
+            color: rgb(216, 180, 254);
+            border: 1px solid rgba(168, 85, 247, 0.28);
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 9999px;
+            line-height: 1.4;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            flex-shrink: 0;
+        }
+
+        .leviosa-restore-btn:hover {
+            background-color: rgba(56, 189, 248, 0.18) !important;
+            color: rgb(125, 211, 252) !important;
+        }
+
+        /* 隐藏官方原始历史按钮，由 Leviosa 历史入口无缝接管 */
+        [data-testid="history-button"], a[href="/history"] {
+            display: none !important;
+        }
+    `;
+
     if (document.getElementById('leviosa-history-view')) {
         historyContainer = document.getElementById('leviosa-history-view');
         return;
-    }
-
-    // 动态注入历史大厅透明毛玻璃联动样式（对齐左侧边栏质感）
-    const glassStyleId = 'leviosa-history-glass-style';
-    if (!document.getElementById(glassStyleId)) {
-        const style = document.createElement('style');
-        style.id = glassStyleId;
-        style.textContent = `
-            #leviosa-history-view {
-                background-image:
-                    linear-gradient(color-mix(in srgb, var(--antigravity-theme-color, #1e1e1e) 75%, transparent), color-mix(in srgb, var(--antigravity-theme-color, #1e1e1e) 75%, transparent)),
-                    linear-gradient(135deg, transparent 0%, rgba(0, 0, 0, 0.05) 40%),
-                    var(--antigravity-bg) !important;
-                background-size: cover !important;
-                background-position: center !important;
-                background-repeat: no-repeat !important;
-                background-attachment: fixed !important;
-                background-color: transparent !important;
-                backdrop-filter: blur(2px) !important;
-                -webkit-backdrop-filter: blur(2px) !important;
-                box-shadow: inset 1px 0 0 0 rgba(255, 255, 255, 0.05) !important;
-            }
-
-            #leviosa-sticky-header {
-                background-color: transparent !important;
-                background-image: none !important;
-                backdrop-filter: blur(16px) !important;
-                -webkit-backdrop-filter: blur(16px) !important;
-            }
-
-            .leviosa-project-group {
-                background-color: color-mix(in srgb, var(--antigravity-theme-color, #1e1e1e) 45%, transparent) !important;
-                backdrop-filter: blur(8px) !important;
-                -webkit-backdrop-filter: blur(8px) !important;
-                transition: border-color 0.25s ease, box-shadow 0.25s ease;
-            }
-            .leviosa-project-group:hover {
-                filter: brightness(1.03);
-            }
-
-            #leviosa-history-list [data-leviosa-convo-id]:hover {
-                background-color: rgba(255, 255, 255, 0.08) !important;
-            }
-
-            /* 隐藏官方原始历史按钮，由 Leviosa 历史入口无缝接管 */
-            [data-testid="history-button"], a[href="/history"] {
-                display: none !important;
-            }
-        `;
-        (document.head || document.documentElement).appendChild(style);
     }
 
     historyContainer = document.createElement('div');
@@ -236,6 +274,16 @@ function ensureHistoryContainer() {
                             <path d="M411.15-260v-60H548.46v60H411.15Zm-155-190v-60H703.46v60H256.16ZM140-640v-60H820v60H140Z"></path>
                         </svg>
                         <span id="leviosa-filter-label">All</span>
+                    </button>
+
+                    <!-- 30天自动归档生命周期巡检与执行按钮 -->
+                    <button id="leviosa-auto-archive-btn" class="inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-muted border border-border text-secondary-foreground hover:text-foreground h-8 px-2.5 rounded-lg text-xs gap-1.5" title="扫描并执行 30 天空闲会话自动浅归档 / 深归档冷备（自动豁免活跃看板任务会话）">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect width="20" height="5" x="2" y="3" rx="1"></rect>
+                            <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path>
+                            <path d="M10 12h4"></path>
+                        </svg>
+                        <span id="leviosa-auto-archive-label">Auto Archive</span>
                     </button>
 
                     <!-- 一键清理过期子代理按钮 (保护最近1小时活跃子代理) -->
@@ -306,6 +354,108 @@ function ensureHistoryContainer() {
     refreshBtn.addEventListener('click', () => {
         fetchAndRenderHistory();
     });
+
+    // 绑定 30 天自动归档巡检与执行按钮
+    const autoArchiveBtn = historyContainer.querySelector('#leviosa-auto-archive-btn');
+    const autoArchiveLabel = historyContainer.querySelector('#leviosa-auto-archive-label');
+    if (autoArchiveBtn) {
+        autoArchiveBtn.addEventListener('click', async () => {
+            autoArchiveBtn.disabled = true;
+            autoArchiveLabel.textContent = 'Scanning...';
+
+            const pathMatch = window.location.pathname.match(/\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+            const currUuid = pathMatch ? pathMatch[1] : '';
+            const currParam = currUuid ? `&currentUuid=${encodeURIComponent(currUuid)}` : '';
+
+            try {
+                const scanRes = await fetch(`${API_BASE}?action=auto_lifecycle&dryRun=true&force=true&nocache=1${currParam}`);
+                const scanData = await scanRes.json();
+
+                if (!scanData.success) {
+                    window.alert('自动归档巡检失败: ' + (scanData.error || '未知错误'));
+                    autoArchiveLabel.textContent = 'Auto Archive';
+                    autoArchiveBtn.disabled = false;
+                    return;
+                }
+
+                const s1 = Array.isArray(scanData.stage1Candidates) ? scanData.stage1Candidates : [];
+                const s2 = Array.isArray(scanData.stage2Candidates) ? scanData.stage2Candidates : [];
+                const lockedSkipped = Array.isArray(scanData.lockedSkipped) ? scanData.lockedSkipped : [];
+                const lockedCount = lockedSkipped.length;
+
+                if (s1.length === 0 && s2.length === 0) {
+                    autoArchiveLabel.textContent = 'Auto Archive';
+                    autoArchiveBtn.disabled = false;
+                    window.alert(
+                        '30 天自动归档巡检完成：当前没有需要自动浅归档或深归档的空闲会话。' +
+                        (lockedCount > 0 ? `\n（已自动豁免 ${lockedCount} 个关联活跃看板任务的会话）` : '')
+                    );
+                    return;
+                }
+
+                const dialogLines = ['30 天自动归档巡检结果：', ''];
+                dialogLines.push(`• Stage 1 (>30天活跃 -> 浅归档): ${s1.length} 个`);
+                s1.slice(0, 5).forEach(item => {
+                    dialogLines.push(`    - [${item.project || 'General'}] ${item.title || item.uuid}`);
+                });
+                if (s1.length > 5) {
+                    dialogLines.push(`    ... 等共 ${s1.length} 个会话`);
+                }
+
+                dialogLines.push('');
+                dialogLines.push(`• Stage 2 (>30天浅归档 -> 深归档冷备): ${s2.length} 个`);
+                s2.slice(0, 5).forEach(item => {
+                    dialogLines.push(`    - [${item.project || 'General'}] ${item.title || item.uuid}`);
+                });
+                if (s2.length > 5) {
+                    dialogLines.push(`    ... 等共 ${s2.length} 个会话`);
+                }
+
+                if (lockedCount > 0) {
+                    dialogLines.push('');
+                    dialogLines.push(`🛡 已自动豁免保护 (关联活跃看板任务 / 当前打开会话): ${lockedCount} 个`);
+                }
+
+                dialogLines.push('');
+                dialogLines.push('确认立即执行上述自动归档操作吗？');
+
+                const confirmed = window.confirm(dialogLines.join('\n'));
+                if (!confirmed) {
+                    autoArchiveLabel.textContent = 'Auto Archive';
+                    autoArchiveBtn.disabled = false;
+                    return;
+                }
+
+                autoArchiveLabel.textContent = 'Archiving...';
+                const execRes = await fetch(`${API_BASE}?action=auto_lifecycle&force=true&nocache=1${currParam}`);
+                const execData = await execRes.json();
+
+                if (execData.success) {
+                    try {
+                        localStorage.setItem('leviosa_last_auto_lifecycle_ts', String(Date.now()));
+                    } catch (e) {}
+                    autoArchiveLabel.textContent = 'Archived!';
+                    setTimeout(() => {
+                        autoArchiveLabel.textContent = 'Auto Archive';
+                        autoArchiveBtn.disabled = false;
+                    }, 1500);
+                    await fetchAndRenderHistory();
+                    const errs = Array.isArray(execData.errors) ? execData.errors : [];
+                    if (errs.length > 0) {
+                        window.alert(`自动归档已完成，但有 ${errs.length} 个会话出现警告:\n` + errs.map(x => `${x.uuid}: ${x.error}`).join('\n'));
+                    }
+                } else {
+                    window.alert('自动归档执行失败: ' + (execData.error || '未知错误'));
+                    autoArchiveLabel.textContent = 'Auto Archive';
+                    autoArchiveBtn.disabled = false;
+                }
+            } catch (err) {
+                window.alert('自动归档请求失败: ' + err.message);
+                autoArchiveLabel.textContent = 'Auto Archive';
+                autoArchiveBtn.disabled = false;
+            }
+        });
+    }
 
     // 绑定一键清理过期子代理按钮 (保护最近 1 小时活跃子代理)
     const cleanSubagentsBtn = historyContainer.querySelector('#leviosa-clean-subagents-btn');
@@ -436,7 +586,8 @@ async function fetchAndRenderHistory() {
             : data.items.filter(c => !c.archived).length;
         const displayTotal = currentFilter === 'archived' ? data.total : totalActive;
         const totalSubagents = data.totalSubagents || 0;
-        counterEl.innerHTML = `Total: <strong class="text-foreground">${displayTotal}</strong> conversations${totalSubagents > 0 ? ` <span class="text-muted-foreground/80 font-normal">(+${totalSubagents} subagents)</span>` : ''} (${data.groups.length} projects)`;
+        const totalCold = data.totalColdArchived || 0;
+        counterEl.innerHTML = `Total: <strong class="text-foreground">${displayTotal}</strong> conversations${totalCold > 0 ? ` <span class="text-muted-foreground/80 font-normal">(+${totalCold} cold)</span>` : ''}${totalSubagents > 0 ? ` <span class="text-muted-foreground/80 font-normal">(+${totalSubagents} subagents)</span>` : ''} (${data.groups.length} projects)`;
 
         if (data.total === 0) {
             listEl.innerHTML = `
@@ -526,7 +677,7 @@ async function fetchAndRenderHistory() {
 
         // 绑定折叠/展开事件
         listEl.querySelectorAll('[data-leviosa-project]').forEach(header => {
-            header.addEventListener('click', (e) => {
+            header.addEventListener('click', () => {
                 const proj = header.getAttribute('data-leviosa-project');
                 if (collapsedProjects.has(proj)) {
                     collapsedProjects.delete(proj);
@@ -551,16 +702,32 @@ async function fetchAndRenderHistory() {
             });
         });
 
-        // 绑定卡片行点击与跳转逻辑（彻底拦截浏览器默认跳转，执行平滑无刷新 SPA 定位）
+        // 绑定卡片行点击与跳转逻辑（彻底拦截浏览器默认跳转，执行平滑无刷新 SPA 定位；云端冷备会话拦截提示拉回恢复）
         listEl.querySelectorAll('[data-leviosa-convo-id]').forEach(row => {
             const convoId = row.getAttribute('data-leviosa-convo-id');
+            const isColdRow = row.getAttribute('data-cold-archived') === 'true';
             const link = row.querySelector('a');
 
             const handleNavigate = (e) => {
-                // 防御：若点击的是归档/删除等操作按钮，不触发跳转
+                // 防御：若点击的是归档/删除/冷备恢复等操作按钮，不触发行级跳转
                 if (e.target.closest('button[data-action]')) return;
                 e.preventDefault();
                 e.stopPropagation();
+
+                if (isColdRow) {
+                    const rowTitle = row.getAttribute('data-convo-title') || convoId;
+                    const confirmed = window.confirm(`会话 "${rowTitle}" 当前处于冷备状态，是否立即拉回并恢复到本地？`);
+                    if (confirmed) {
+                        const restoreBtn = row.querySelector('button[data-action="restore_deep"]');
+                        if (restoreBtn) {
+                            restoreBtn.setAttribute('data-skip-confirm', '1');
+                            restoreBtn.setAttribute('data-navigate-after-restore', '1');
+                            restoreBtn.click();
+                        }
+                    }
+                    return;
+                }
+
                 navigateToConversation(convoId);
                 toggleHistoryView(false);
             };
@@ -571,7 +738,7 @@ async function fetchAndRenderHistory() {
             row.addEventListener('click', handleNavigate);
         });
 
-        // 绑定归档/重新打开、删除按钮操作（与 SQLite 及本地归档系统深度联动）
+        // 绑定归档/重新打开、删除、冷备拉回恢复按钮操作
         listEl.querySelectorAll('button[data-action]').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.preventDefault();
@@ -585,6 +752,19 @@ async function fetchAndRenderHistory() {
                 if (action === 'delete') {
                     const confirmed = window.confirm(`确定要彻底删除会话 "${title || uuid}" 吗？\n（系统将自动在删除前创建安全深层备份）`);
                     if (!confirmed) return;
+                }
+
+                let navigateAfterRestore = false;
+                if (action === 'restore_deep') {
+                    const skipConfirm = btn.getAttribute('data-skip-confirm') === '1';
+                    navigateAfterRestore = btn.getAttribute('data-navigate-after-restore') === '1';
+                    btn.removeAttribute('data-skip-confirm');
+                    btn.removeAttribute('data-navigate-after-restore');
+
+                    if (!skipConfirm) {
+                        const confirmed = window.confirm(`确定要从冷备拉回并恢复会话 "${title || uuid}" 吗？`);
+                        if (!confirmed) return;
+                    }
                 }
 
                 btn.disabled = true;
@@ -601,6 +781,10 @@ async function fetchAndRenderHistory() {
                     const result = await res.json();
                     if (result.success) {
                         await fetchAndRenderHistory();
+                        if (action === 'restore_deep' && navigateAfterRestore) {
+                            navigateToConversation(uuid);
+                            toggleHistoryView(false);
+                        }
                     } else {
                         alert(`操作失败: ${result.error || '未知错误'}`);
                         btn.disabled = false;
@@ -620,22 +804,36 @@ async function fetchAndRenderHistory() {
 }
 
 /**
- * 渲染单个会话行卡片（100% 对齐原生 Tailwind 结构）
+ * 渲染单个会话行卡片（100% 对齐原生 Tailwind 结构，支持云端 115 冷备胶囊与一键拉回恢复）
  */
 function renderConversationRow(convo, showProjectBadge = false) {
-    const isRunning = convo.isRunning;
-    const isArchived = !!convo.archived;
+    const isRunning = Boolean(convo.isRunning);
+    const isArchived = Boolean(convo.archived);
+    const isColdArchived = Boolean(convo.coldArchived);
+    const isLocalEvicted = Boolean(convo.localEvicted);
     const relTime = convo.relativeTime || '';
 
-    return `
-        <div data-leviosa-convo-id="${convo.id}" class="relative w-full select-none cursor-pointer rounded-lg flex flex-row justify-between group items-center px-3 py-2 hover:bg-muted/80 transition-colors">
-            <!-- 路由原生链接 -->
-            <a href="/c/${convo.id}" class="absolute inset-0 rounded-lg no-underline z-0" aria-label="${escapeHtml(convo.title)}"></a>
+    const storageLabel = (convo.storage && String(convo.storage).includes('115')) ? '115' : 'Cloud';
+    const coldPillHtml = isColdArchived
+        ? (isLocalEvicted
+            ? `<span class="leviosa-cold-pill" title="已深归档并卸载至远端冷备 (${escapeHtml(convo.storage || 'Cloud')})">☁️ ${escapeHtml(storageLabel)}</span>`
+            : `<span class="leviosa-local-deep-pill" title="已深归档至本地压缩包">📦 Deep</span>`)
+        : '';
 
-            <!-- 标题展示 -->
+    return `
+        <div data-leviosa-convo-id="${convo.id}" ${isColdArchived ? 'data-cold-archived="true"' : ''} data-convo-title="${escapeHtml(convo.title)}" class="relative w-full select-none cursor-pointer rounded-lg flex flex-row justify-between group items-center px-3 py-2 hover:bg-muted/80 transition-colors">
+            ${!isColdArchived ? `
+                <!-- 路由原生链接（仅本地可用会话挂载 href，冷备会话点击由冷备恢复拦截器接管） -->
+                <a href="/c/${convo.id}" class="absolute inset-0 rounded-lg no-underline z-0" aria-label="${escapeHtml(convo.title)}"></a>
+            ` : ''}
+
+            <!-- 标题与云端冷备状态胶囊展示 -->
             <div class="relative flex gap-2 grow min-w-0 items-center pointer-events-none z-10">
                 <div class="flex flex-col items-start min-w-0 w-full text-secondary-foreground group-hover:text-foreground">
-                    <span class="truncate inline-block text-left w-full text-sm font-medium ${isArchived ? 'opacity-70' : ''}">${escapeHtml(convo.title)}</span>
+                    <div class="flex items-center gap-1.5 min-w-0 w-full">
+                        <span class="truncate inline-block text-left text-sm font-medium ${isArchived ? 'opacity-70' : ''}">${escapeHtml(convo.title)}</span>
+                        ${coldPillHtml}
+                    </div>
                     ${showProjectBadge ? `
                         <div class="flex items-center gap-1.5 text-[11px] text-muted-foreground opacity-70 mt-0.5">
                             <span data-project-timeline-dot="${escapeHtml(convo.project)}" class="w-1.5 h-1.5 rounded-full shrink-0 ${getProjectColor(convo.project) ? '' : 'hidden'}" style="background-color: ${getProjectColor(convo.project) || 'transparent'}"></span>
@@ -647,42 +845,52 @@ function renderConversationRow(convo, showProjectBadge = false) {
 
             <!-- 右侧状态指示器与悬停浮动按钮 -->
             <div class="relative flex items-center shrink-0 ml-2 pointer-events-auto z-10 min-h-[24px]">
-                <!-- 悬停时浮现的操作栏（归档/重新打开、删除） -->
+                <!-- 悬停时浮现的操作栏 -->
                 <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    ${isRunning ? `
-                        <span class="h-5 px-1.5 text-[11px] flex items-center justify-center rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 font-medium">
-                            Running
-                        </span>
-                    ` : ''}
-                    
-                    ${isArchived ? `
-                        <button type="button" data-action="unarchive" data-convo-id="${convo.id}" data-convo-title="${escapeHtml(convo.title)}" data-convo-project="${escapeHtml(convo.project)}" class="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center" title="Reopen conversation">
+                    ${isColdArchived ? `
+                        <button type="button" data-action="restore_deep" data-convo-id="${convo.id}" data-convo-title="${escapeHtml(convo.title)}" data-convo-project="${escapeHtml(convo.project)}" class="leviosa-restore-btn p-1 rounded-md text-muted-foreground transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center" title="从冷备拉回并恢复此会话">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect width="20" height="5" x="2" y="3" rx="1"></rect>
-                                <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path>
-                                <path d="m9 15 3-3 3 3"></path>
-                                <path d="M12 12v6"></path>
+                                <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                                <path d="M12 12v9"></path>
+                                <path d="m8 17 4 4 4-4"></path>
                             </svg>
                         </button>
                     ` : `
-                        <button type="button" data-action="archive" data-convo-id="${convo.id}" data-convo-title="${escapeHtml(convo.title)}" data-convo-project="${escapeHtml(convo.project)}" class="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center" title="Archive conversation">
+                        ${isRunning ? `
+                            <span class="h-5 px-1.5 text-[11px] flex items-center justify-center rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 font-medium">
+                                Running
+                            </span>
+                        ` : ''}
+                        
+                        ${isArchived ? `
+                            <button type="button" data-action="unarchive" data-convo-id="${convo.id}" data-convo-title="${escapeHtml(convo.title)}" data-convo-project="${escapeHtml(convo.project)}" class="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center" title="Reopen conversation">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect width="20" height="5" x="2" y="3" rx="1"></rect>
+                                    <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path>
+                                    <path d="m9 15 3-3 3 3"></path>
+                                    <path d="M12 12v6"></path>
+                                </svg>
+                            </button>
+                        ` : `
+                            <button type="button" data-action="archive" data-convo-id="${convo.id}" data-convo-title="${escapeHtml(convo.title)}" data-convo-project="${escapeHtml(convo.project)}" class="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center" title="Archive conversation">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect width="20" height="5" x="2" y="3" rx="1"></rect>
+                                    <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path>
+                                    <path d="M10 12h4"></path>
+                                </svg>
+                            </button>
+                        `}
+
+                        <button type="button" data-action="delete" data-convo-id="${convo.id}" data-convo-title="${escapeHtml(convo.title)}" data-convo-project="${escapeHtml(convo.project)}" class="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center" title="Delete conversation">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect width="20" height="5" x="2" y="3" rx="1"></rect>
-                                <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path>
-                                <path d="M10 12h4"></path>
+                                <path d="M3 6h18"></path>
+                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                <line x1="10" x2="10" y1="11" y2="17"></line>
+                                <line x1="14" x2="14" y1="11" y2="17"></line>
                             </svg>
                         </button>
                     `}
-
-                    <button type="button" data-action="delete" data-convo-id="${convo.id}" data-convo-title="${escapeHtml(convo.title)}" data-convo-project="${escapeHtml(convo.project)}" class="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center" title="Delete conversation">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 6h18"></path>
-                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                            <line x1="10" x2="10" y1="11" y2="17"></line>
-                            <line x1="14" x2="14" y1="11" y2="17"></line>
-                        </svg>
-                    </button>
                 </div>
 
                 <!-- 静止状态下展示的标记（悬停时淡出） -->

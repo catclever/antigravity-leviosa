@@ -2,7 +2,8 @@
 
 const HOOK_CONFIG = {
     enableShallowArchive: true,  // 开启/关闭浅层归档监听（点击普通归档按钮时触发清理）
-    enableDeepArchive: true      // 开启/关闭深层归档监听（注入 Deep Archive 按钮到删除弹窗）
+    enableDeepArchive: true,     // 开启/关闭深层归档监听（注入 Deep Archive 按钮到删除弹窗）
+    enableAutoLifecycle: true    // 开启/关闭启动后静默 30 天自动归档生命周期巡检（24h 防抖）
 };
 
 export function initArchiveHook() {
@@ -37,10 +38,15 @@ export function initArchiveHook() {
                 if (titleSpan) metadata.title = (titleSpan.getAttribute('aria-label') || titleSpan.textContent).trim();
             }
             
-            const projectSpan = rowDom.querySelector('.text-xs.text-muted-foreground');
-            if (projectSpan) {
-                const cloned = projectSpan.cloneNode(true);
-                metadata.project = cloned.textContent.trim();
+            const subtext = rowDom.getAttribute('data-subtext');
+            if (subtext) {
+                metadata.project = subtext.trim();
+            } else {
+                const projectSpan = rowDom.querySelector('.text-sm.text-muted-foreground, .text-xs.text-muted-foreground');
+                if (projectSpan) {
+                    const cloned = projectSpan.cloneNode(true);
+                    metadata.project = cloned.textContent.trim();
+                }
             }
             
             // 如果在 DOM 里直接找到了 uuid，就直接返回，不再去爬虚拟树！
@@ -60,7 +66,6 @@ export function initArchiveHook() {
                 function fastSearchUUID(props, targetTitle) {
                     if (!props || typeof props !== 'object') return null;
                     
-                    const idRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
                     const normalize = (s) => (s || '').replace(/\\s+/g, '').toLowerCase();
                     const normTarget = normalize(targetTitle);
                     
@@ -70,8 +75,8 @@ export function initArchiveHook() {
 
                         const idRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
                         // 支持常见的各种命名
-                        let possibleId = obj.id || obj.uuid || obj._id || obj.conversationId || obj.convoId;
-                        let objTitle = obj.title || obj.name;
+                        const possibleId = obj.id || obj.uuid || obj._id || obj.conversationId || obj.convoId;
+                        const objTitle = obj.title || obj.name;
 
                         if (typeof possibleId === 'string' && idRegex.test(possibleId)) {
                             if (normTarget && objTitle) {
@@ -166,9 +171,6 @@ export function initArchiveHook() {
             }
             return;
         }
-
-
-
     }, true); // 使用捕获阶段
 
     // ==========================================
@@ -179,113 +181,145 @@ export function initArchiveHook() {
 
         // 记录用户最后点击的对话（为了拿到上下文）
         document.addEventListener('click', (e) => {
-        // 放宽限制，只要是可点击的列表项或带有 hover 效果的按钮就尝试提取
-        const row = e.target.closest('div[role="button"], button.hover\\:bg-muted, .group');
-        if (row) {
-            const extracted = extractMetadataFromElement(e.target);
-            if (extracted && (extracted.uuid || (extracted.title && extracted.title !== 'Unknown'))) {
-                pendingDeepArchiveConvo = extracted;
+            // 放宽限制，只要是可点击的列表项或带有 hover 效果的按钮就尝试提取
+            const row = e.target.closest('div[role="button"], button.hover\\:bg-muted, .group');
+            if (row) {
+                const extracted = extractMetadataFromElement(e.target);
+                if (extracted && (extracted.uuid || (extracted.title && extracted.title !== 'Unknown'))) {
+                    pendingDeepArchiveConvo = extracted;
+                }
             }
-        }
-    }, true);
+        }, true);
 
-    const observer = new MutationObserver(() => {
-        // 寻找弹窗的标题 "Delete Conversation"
-        const popupHeaders = Array.from(document.querySelectorAll('.font-medium.text-foreground'));
-        const targetHeader = popupHeaders.find(el => el.textContent.trim() === 'Delete Conversation');
-        
-        if (targetHeader) {
-            const popupContainer = targetHeader.closest('.p-4');
-            if (popupContainer) {
-                const btnGroup = popupContainer.querySelector('.flex.justify-end.gap-3');
-                // 确保找到了按钮组，并且还没有被我们注入过
-                if (btnGroup && !btnGroup.querySelector('#ag-deep-archive-btn')) {
-                    console.log('[Antigravity Mod] 发现 Delete 弹窗，准备注入 Deep Archive 按钮');
-                    
-                    const deepBtn = document.createElement('button');
-                    deepBtn.id = 'ag-deep-archive-btn';
-                    // 使用稍微不同于原生 Delete 按钮的颜色（比如蓝色背景）以作区分
-                    deepBtn.className = 'select-none text-sm font-medium transition-all rounded-md px-3 py-1 outline-none bg-blue-600 text-white hover:bg-blue-700 cursor-pointer flex flex-row items-center gap-2';
-                    deepBtn.innerHTML = 'Deep Archive <span class="opacity-60 text-xs">📦</span>';
-                    
-                    // 将它插入在 Delete 按钮的前面（或者直接插在容器里）
-                    const deleteBtn = btnGroup.lastElementChild;
-                    btnGroup.insertBefore(deepBtn, deleteBtn);
-                    
-                    deepBtn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
+        const observer = new MutationObserver(() => {
+            // 寻找弹窗的标题 "Delete Conversation"
+            const popupHeaders = Array.from(document.querySelectorAll('.font-medium.text-foreground'));
+            const targetHeader = popupHeaders.find(el => el.textContent.trim() === 'Delete Conversation');
+            
+            if (targetHeader) {
+                const popupContainer = targetHeader.closest('.p-4');
+                if (popupContainer) {
+                    const btnGroup = popupContainer.querySelector('.flex.justify-end.gap-3');
+                    // 确保找到了按钮组，并且还没有被我们注入过
+                    if (btnGroup && !btnGroup.querySelector('#ag-deep-archive-btn')) {
+                        console.log('[Antigravity Mod] 发现 Delete 弹窗，准备注入 Deep Archive 按钮');
                         
-                        const info = pendingDeepArchiveConvo || { uuid: null, title: 'N/A' };
+                        const deepBtn = document.createElement('button');
+                        deepBtn.id = 'ag-deep-archive-btn';
+                        // 使用稍微不同于原生 Delete 按钮的颜色（比如蓝色背景）以作区分
+                        deepBtn.className = 'select-none text-sm font-medium transition-all rounded-md px-3 py-1 outline-none bg-blue-600 text-white hover:bg-blue-700 cursor-pointer flex flex-row items-center gap-2';
+                        deepBtn.innerHTML = 'Deep Archive <span class="opacity-60 text-xs">📦</span>';
                         
-                        // 改变按钮状态为 Loading
-                        deepBtn.innerHTML = 'Archiving... <span class="opacity-60 text-xs">⏳</span>';
-                        deepBtn.disabled = true;
+                        // 将它插入在 Delete 按钮的前面（或者直接插在容器里）
+                        const deleteBtn = btnGroup.lastElementChild;
+                        btnGroup.insertBefore(deepBtn, deleteBtn);
+                        
+                        deepBtn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            const info = pendingDeepArchiveConvo || { uuid: null, title: 'N/A' };
+                            
+                            // 改变按钮状态为 Loading
+                            deepBtn.innerHTML = 'Archiving... <span class="opacity-60 text-xs">⏳</span>';
+                            deepBtn.disabled = true;
 
-                        if (!info.uuid && info.title !== 'N/A') {
-                            console.log(`[Antigravity Mod] DOM 提取失败，启动账本兜底查询 (Title: ${info.title})`);
-                            const lookupUrl = `http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/archive_brain?action=lookup&title=${encodeURIComponent(info.title)}`;
-                            fetch(lookupUrl).then(res => res.json()).then(lookupData => {
-                                if (lookupData.success && lookupData.uuid) {
-                                    console.log(`[Antigravity Mod] 账本兜底成功！找到 UUID: ${lookupData.uuid}`);
-                                    info.uuid = lookupData.uuid;
-                                    if (lookupData.project) info.project = lookupData.project;
-                                    triggerPopupDeepArchive(info, deepBtn, deleteBtn);
-                                } else {
-                                    // 终极保底：如果账本查不到，看看是不是就是当前正在看的这个对话
-                                    const urlMatch = window.location.pathname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-                                    const pageTitle = document.title || '';
-                                    if (urlMatch && (pageTitle.includes(info.title) || info.title === 'N/A')) {
-                                        console.log(`[Antigravity Mod] 账本未找到，但当前页面 URL 匹配，且标题一致，安全使用当前 URL UUID`);
-                                        info.uuid = urlMatch[0];
+                            if (!info.uuid && info.title !== 'N/A') {
+                                console.log(`[Antigravity Mod] DOM 提取失败，启动账本兜底查询 (Title: ${info.title})`);
+                                const lookupUrl = `http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/archive_brain?action=lookup&title=${encodeURIComponent(info.title)}`;
+                                fetch(lookupUrl).then(res => res.json()).then(lookupData => {
+                                    if (lookupData.success && lookupData.uuid) {
+                                        console.log(`[Antigravity Mod] 账本兜底成功！找到 UUID: ${lookupData.uuid}`);
+                                        info.uuid = lookupData.uuid;
+                                        if (lookupData.project) info.project = lookupData.project;
                                         triggerPopupDeepArchive(info, deepBtn, deleteBtn);
                                     } else {
-                                        alert(`未找到对话 UUID，且账本兜底查询失败：\n${lookupData.error || '未知错误'}\n（提示：只能归档曾经活动过或当前打开的对话）`);
+                                        // 终极保底：如果账本查不到，看看是不是就是当前正在看的这个对话
+                                        const urlMatch = window.location.pathname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+                                        const pageTitle = document.title || '';
+                                        if (urlMatch && (pageTitle.includes(info.title) || info.title === 'N/A')) {
+                                            console.log(`[Antigravity Mod] 账本未找到，但当前页面 URL 匹配，且标题一致，安全使用当前 URL UUID`);
+                                            info.uuid = urlMatch[0];
+                                            triggerPopupDeepArchive(info, deepBtn, deleteBtn);
+                                        } else {
+                                            alert(`未找到对话 UUID，且账本兜底查询失败：\n${lookupData.error || '未知错误'}\n（提示：只能归档曾经活动过或当前打开的对话）`);
+                                            deepBtn.innerHTML = 'Deep Archive <span class="opacity-60 text-xs">📦</span>';
+                                            deepBtn.disabled = false;
+                                        }
+                                    }
+                                }).catch(err => {
+                                    alert('兜底查询请求失败: ' + err);
+                                    deepBtn.innerHTML = 'Deep Archive <span class="opacity-60 text-xs">📦</span>';
+                                    deepBtn.disabled = false;
+                                });
+                                return;
+                            } else if (!info.uuid) {
+                                alert('未找到对话 UUID，且没有标题，无法执行归档。');
+                                deepBtn.innerHTML = 'Deep Archive <span class="opacity-60 text-xs">📦</span>';
+                                deepBtn.disabled = false;
+                                return;
+                            }
+                            
+                            triggerPopupDeepArchive(info, deepBtn, deleteBtn);
+
+                            function triggerPopupDeepArchive(info, deepBtn, deleteBtn) {
+                                console.log(`[Antigravity Mod] 触发深层归档 (弹窗按钮), UUID: ${info.uuid}`);
+                                const url = `http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/archive_brain?action=deep&uuid=${info.uuid}&title=${encodeURIComponent(info.title)}&project=${encodeURIComponent(info.project)}`;
+                                
+                                fetch(url).then(res => res.json()).then(data => {
+                                    if (data.success) {
+                                        console.log('[Antigravity Mod] Deep Archive 弹窗打包成功！准备点击原生 Delete。');
+                                        if (deleteBtn) deleteBtn.click();
+                                    } else {
+                                        alert('深层归档打包失败: ' + data.error);
                                         deepBtn.innerHTML = 'Deep Archive <span class="opacity-60 text-xs">📦</span>';
                                         deepBtn.disabled = false;
                                     }
-                                }
-                            }).catch(err => {
-                                alert('兜底查询请求失败: ' + err);
-                                deepBtn.innerHTML = 'Deep Archive <span class="opacity-60 text-xs">📦</span>';
-                                deepBtn.disabled = false;
-                            });
-                            return;
-                        } else if (!info.uuid) {
-                            alert('未找到对话 UUID，且没有标题，无法执行归档。');
-                            deepBtn.innerHTML = 'Deep Archive <span class="opacity-60 text-xs">📦</span>';
-                            deepBtn.disabled = false;
-                            return;
-                        }
-                        
-                        triggerPopupDeepArchive(info, deepBtn, deleteBtn);
-
-                        function triggerPopupDeepArchive(info, deepBtn, deleteBtn) {
-                            console.log(`[Antigravity Mod] 触发深层归档 (弹窗按钮), UUID: ${info.uuid}`);
-                            const url = `http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/archive_brain?action=deep&uuid=${info.uuid}&title=${encodeURIComponent(info.title)}&project=${encodeURIComponent(info.project)}`;
-                            
-                            fetch(url).then(res => res.json()).then(data => {
-                                if (data.success) {
-                                    console.log('[Antigravity Mod] Deep Archive 弹窗打包成功！准备点击原生 Delete。');
-                                    if (deleteBtn) deleteBtn.click();
-                                } else {
-                                    alert('深层归档打包失败: ' + data.error);
+                                }).catch(err => {
+                                    alert('请求深层归档失败: ' + err);
                                     deepBtn.innerHTML = 'Deep Archive <span class="opacity-60 text-xs">📦</span>';
                                     deepBtn.disabled = false;
-                                }
-                            }).catch(err => {
-                                alert('请求深层归档失败: ' + err);
-                                deepBtn.innerHTML = 'Deep Archive <span class="opacity-60 text-xs">📦</span>';
-                                deepBtn.disabled = false;
-                            });
-                        }
-                    });
+                                });
+                            }
+                        });
+                    }
                 }
             }
-        }
-    });
+        });
 
-    observer.observe(document.body, { childList: true, subtree: true });
-    
-}
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    // ==========================================
+    // 启动后延迟 10s 静默执行 30 天自动生命周期归档巡检（双端 24h 防抖）
+    // ==========================================
+    if (HOOK_CONFIG.enableAutoLifecycle) {
+        setTimeout(async () => {
+            try {
+                const STORAGE_KEY = 'leviosa_last_auto_lifecycle_ts';
+                const lastTs = localStorage.getItem(STORAGE_KEY);
+                if (lastTs && (Date.now() - Number(lastTs) < 24 * 3600 * 1000)) {
+                    return;
+                }
+                const pathMatch = window.location.pathname.match(/\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+                const currUuid = pathMatch ? pathMatch[1] : '';
+                const url = 'http://127.0.0.1:9216/api/script/apps/com.google.antigravity/worker/conversation_history_api?action=auto_lifecycle'
+                    + (currUuid ? '&currentUuid=' + encodeURIComponent(currUuid) : '');
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data && data.success) {
+                    localStorage.setItem(STORAGE_KEY, String(Date.now()));
+                    console.log('[Antigravity Mod] Auto-archive lifecycle check:', {
+                        skipped: Boolean(data.skipped),
+                        reason: data.reason || null,
+                        stage1Executed: Array.isArray(data.stage1Executed) ? data.stage1Executed.length : 0,
+                        stage2Executed: Array.isArray(data.stage2Executed) ? data.stage2Executed.length : 0,
+                        lockedSkipped: Array.isArray(data.lockedSkipped) ? data.lockedSkipped.length : 0
+                    });
+                }
+            } catch (err) {
+                // 网络或离线异常静默吞没，严禁抛出未捕获 Promise 拒绝
+            }
+        }, 10000);
+    }
 }
